@@ -1397,6 +1397,59 @@ function AdminReg({houses,users,deleteHouse,persistHouse}){
       <span style={{fontSize:'.78rem',color:'var(--txm)',marginLeft:'auto'}}>{houses.length} finca(s)</span>
     </div>
 
+    {/* ── Usuarios sin finca ── */}
+    {(()=>{
+      const usersWithHouse = new Set(houses.map(h=>h.userId).filter(Boolean));
+      // Also check if user appears as resident in any house
+      const usersAsResident = new Set(
+        houses.flatMap(h=>(h.residents||[]).map(r=>r.userId).filter(Boolean))
+      );
+      const noHouse = users.filter(u=>
+        u.role!=='guest' &&
+        !usersWithHouse.has(u.id) &&
+        !usersAsResident.has(u.id)
+      );
+      if(noHouse.length===0) return null;
+      return(
+        <div className="card" style={{marginBottom:'1rem',border:'1px solid #fac775'}}>
+          <div className="card-hdr" style={{background:'var(--amb0)'}}>
+            <h3 style={{color:'var(--amb)'}}>⚠️ Usuarios sin finca registrada ({noHouse.length})</h3>
+            <span className="badge amber">{noHouse.length} pendiente(s)</span>
+          </div>
+          <div className="card-body" style={{paddingTop:'.65rem'}}>
+            <p style={{fontSize:'.78rem',color:'var(--txm)',marginBottom:'.75rem',lineHeight:1.5}}>
+              Estos usuarios tienen cuenta en el frente pero no están asociados a ninguna finca. Puede crear una finca y asignársela, o pedirles que la registren desde su perfil.
+            </p>
+            {noHouse.map(u=>(
+              <div key={u.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'.65rem .75rem',background:'var(--bg)',borderRadius:6,marginBottom:5,border:'1px solid var(--bdr)',flexWrap:'wrap'}}>
+                <div style={{display:'flex',alignItems:'center',gap:9}}>
+                  <div style={{width:32,height:32,background:u.role==='admin'?'var(--amb0)':'var(--g1)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'.72rem',fontWeight:600,color:u.role==='admin'?'var(--amb)':'var(--g7)',flexShrink:0}}>
+                    {u.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
+                  </div>
+                  <div>
+                    <p style={{fontWeight:500,fontSize:'.85rem'}}>{u.name}</p>
+                    <p style={{fontSize:'.75rem',color:'var(--txm)'}}>@{u.username} {u.phone&&`· 📞 ${u.phone}`} · <span className={`badge ${u.role==='admin'?'amber':'green'}`} style={{fontSize:'.65rem'}}>{u.role==='admin'?'Coordinador':'Habitante'}</span></p>
+                  </div>
+                </div>
+                <button
+                  className="btn btn-p btn-sm"
+                  onClick={()=>{
+                    // Pre-fill create form with this user
+                    onUserSelect(u.id);
+                    setCreating(true);
+                    setEditingId(null);
+                    window.scrollTo({top:0,behavior:'smooth'});
+                  }}
+                >
+                  🏡 Crear finca para este usuario
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    })()}
+
     {/* ── Create form ── */}
     {creating&&(
       <div className="card" style={{marginBottom:'1rem',border:'2px solid var(--g3)'}}>
