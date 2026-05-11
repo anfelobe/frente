@@ -1303,6 +1303,82 @@ function IncidentsView({incidents}){
   </>);
 }
 
+/* ══ USER NO HOUSE ROW ══ */
+function UserNoHouseRow({u,houses,onCreateNew,onAddToHouse}){
+  const [showPicker,setShowPicker]=useState(false);
+  const [done,setDone]=useState(false);
+  const initials=n=>n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+  const handleAdd=async(house)=>{
+    await onAddToHouse(house);
+    setDone(true);
+    setShowPicker(false);
+  };
+
+  if(done) return(
+    <div style={{display:'flex',alignItems:'center',gap:9,padding:'.65rem .75rem',background:'var(--g0)',borderRadius:6,marginBottom:5,border:'1px solid var(--g2)'}}>
+      <span style={{fontSize:'1rem'}}>✅</span>
+      <p style={{fontSize:'.83rem',color:'var(--g7)'}}><strong>{u.name}</strong> fue asociado a una finca.</p>
+    </div>
+  );
+
+  return(
+    <div style={{background:'var(--bg)',borderRadius:6,marginBottom:6,border:'1px solid var(--bdr)',overflow:'hidden'}}>
+      {/* User info row */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'.65rem .75rem',flexWrap:'wrap'}}>
+        <div style={{display:'flex',alignItems:'center',gap:9}}>
+          <div style={{width:32,height:32,background:u.role==='admin'?'var(--amb0)':'var(--g1)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'.72rem',fontWeight:600,color:u.role==='admin'?'var(--amb)':'var(--g7)',flexShrink:0}}>
+            {initials(u.name)}
+          </div>
+          <div>
+            <p style={{fontWeight:500,fontSize:'.85rem'}}>{u.name}</p>
+            <p style={{fontSize:'.73rem',color:'var(--txm)'}}>@{u.username}{u.phone&&` · 📞 ${u.phone}`} · <span className={`badge ${u.role==='admin'?'amber':'green'}`} style={{fontSize:'.63rem'}}>{u.role==='admin'?'Coordinador':'Habitante'}</span></p>
+          </div>
+        </div>
+        {/* Action buttons */}
+        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+          <button className="btn btn-p btn-sm" onClick={onCreateNew}>
+            🏡 Nueva finca
+          </button>
+          <button
+            className="btn btn-s btn-sm"
+            style={showPicker?{background:'var(--sky0)',borderColor:'var(--sky)',color:'var(--sky)'}:{}}
+            onClick={()=>setShowPicker(p=>!p)}
+          >
+            👥 {showPicker?'Cerrar':'Añadir a finca existente'}
+          </button>
+        </div>
+      </div>
+
+      {/* House picker */}
+      {showPicker&&(
+        <div style={{borderTop:'1px solid var(--bdr)',padding:'.65rem .75rem',background:'var(--surf)'}}>
+          <p style={{fontSize:'.75rem',fontWeight:500,color:'var(--txs)',marginBottom:'.5rem'}}>
+            Seleccione la finca a la que pertenece <strong>{u.name}</strong>:
+          </p>
+          {houses.length===0&&<p style={{fontSize:'.78rem',color:'var(--txm)'}}>No hay fincas registradas aún.</p>}
+          {houses.map(h=>(
+            <div key={h.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'.55rem .7rem',background:'var(--bg)',borderRadius:6,marginBottom:4,border:'1px solid var(--bdr)'}}>
+              <div>
+                <p style={{fontWeight:500,fontSize:'.83rem'}}>{h.name}</p>
+                <p style={{fontSize:'.73rem',color:'var(--txm)'}}>{h.owner} · <span className="badge gray">{h.type}</span></p>
+                {h.residents&&h.residents.length>0&&(
+                  <p style={{fontSize:'.7rem',color:'var(--txm)',marginTop:2}}>
+                    👥 {h.residents.map(r=>r.name).filter(Boolean).join(', ')}
+                  </p>
+                )}
+              </div>
+              <button className="btn btn-p btn-sm" onClick={()=>handleAdd(h)}>
+                + Añadir aquí
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ══ ADMIN: REGISTRO ══ */
 function AdminReg({houses,users,deleteHouse,persistHouse}){
   const [editingId,setEditingId]=useState(null);
@@ -1400,7 +1476,6 @@ function AdminReg({houses,users,deleteHouse,persistHouse}){
     {/* ── Usuarios sin finca ── */}
     {(()=>{
       const usersWithHouse = new Set(houses.map(h=>h.userId).filter(Boolean));
-      // Also check if user appears as resident in any house
       const usersAsResident = new Set(
         houses.flatMap(h=>(h.residents||[]).map(r=>r.userId).filter(Boolean))
       );
@@ -1410,6 +1485,7 @@ function AdminReg({houses,users,deleteHouse,persistHouse}){
         !usersAsResident.has(u.id)
       );
       if(noHouse.length===0) return null;
+
       return(
         <div className="card" style={{marginBottom:'1rem',border:'1px solid #fac775'}}>
           <div className="card-hdr" style={{background:'var(--amb0)'}}>
@@ -1418,32 +1494,26 @@ function AdminReg({houses,users,deleteHouse,persistHouse}){
           </div>
           <div className="card-body" style={{paddingTop:'.65rem'}}>
             <p style={{fontSize:'.78rem',color:'var(--txm)',marginBottom:'.75rem',lineHeight:1.5}}>
-              Estos usuarios tienen cuenta en el frente pero no están asociados a ninguna finca. Puede crear una finca y asignársela, o pedirles que la registren desde su perfil.
+              Estos usuarios tienen cuenta pero no están asociados a ninguna propiedad. Créeles una finca nueva o añádalos a una ya existente.
             </p>
             {noHouse.map(u=>(
-              <div key={u.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'.65rem .75rem',background:'var(--bg)',borderRadius:6,marginBottom:5,border:'1px solid var(--bdr)',flexWrap:'wrap'}}>
-                <div style={{display:'flex',alignItems:'center',gap:9}}>
-                  <div style={{width:32,height:32,background:u.role==='admin'?'var(--amb0)':'var(--g1)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'.72rem',fontWeight:600,color:u.role==='admin'?'var(--amb)':'var(--g7)',flexShrink:0}}>
-                    {u.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
-                  </div>
-                  <div>
-                    <p style={{fontWeight:500,fontSize:'.85rem'}}>{u.name}</p>
-                    <p style={{fontSize:'.75rem',color:'var(--txm)'}}>@{u.username} {u.phone&&`· 📞 ${u.phone}`} · <span className={`badge ${u.role==='admin'?'amber':'green'}`} style={{fontSize:'.65rem'}}>{u.role==='admin'?'Coordinador':'Habitante'}</span></p>
-                  </div>
-                </div>
-                <button
-                  className="btn btn-p btn-sm"
-                  onClick={()=>{
-                    // Pre-fill create form with this user
-                    onUserSelect(u.id);
-                    setCreating(true);
-                    setEditingId(null);
-                    window.scrollTo({top:0,behavior:'smooth'});
-                  }}
-                >
-                  🏡 Crear finca para este usuario
-                </button>
-              </div>
+              <UserNoHouseRow
+                key={u.id}
+                u={u}
+                houses={houses}
+                onCreateNew={()=>{
+                  onUserSelect(u.id);
+                  setCreating(true);
+                  setEditingId(null);
+                  window.scrollTo({top:0,behavior:'smooth'});
+                }}
+                onAddToHouse={async(house)=>{
+                  const newRes=[...(house.residents||[{name:house.owner,phone:house.phones?.[0]||''}]),
+                    {name:u.name,phone:u.phone||'',userId:u.id}];
+                  const phones=[...new Set(newRes.map(r=>r.phone).filter(Boolean))];
+                  await persistHouse({...house,residents:newRes,phones});
+                }}
+              />
             ))}
           </div>
         </div>
