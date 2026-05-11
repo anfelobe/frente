@@ -348,6 +348,9 @@ function GMap({houses,infra,showInfra,onMapClick,clickable}){
   const ref = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
+  const clickListenerRef = useRef(null);
+  const onMapClickRef = useRef(onMapClick);
+  useEffect(()=>{ onMapClickRef.current = onMapClick; },[onMapClick]);
 
   useEffect(()=>{
     if(!hasMapsKey()) return;
@@ -362,14 +365,27 @@ function GMap({houses,infra,showInfra,onMapClick,clickable}){
         zoomControl:true,
       });
       mapRef.current = map;
-      if(clickable){
-        map.addListener('click',e=>{
-          onMapClick && onMapClick({lat:e.latLng.lat().toFixed(6),lng:e.latLng.lng().toFixed(6)});
-        });
-      }
       renderMarkers(map,houses,infra,showInfra);
     });
   },[]);
+
+  // Add/remove click listener whenever clickable changes
+  useEffect(()=>{
+    if(!mapRef.current||!hasMapsKey()) return;
+    if(clickListenerRef.current){
+      window.google.maps.event.removeListener(clickListenerRef.current);
+      clickListenerRef.current = null;
+      mapRef.current.setOptions({draggableCursor:''});
+    }
+    if(clickable){
+      mapRef.current.setOptions({draggableCursor:'crosshair'});
+      clickListenerRef.current = mapRef.current.addListener('click',e=>{
+        const lat = e.latLng.lat().toFixed(6);
+        const lng = e.latLng.lng().toFixed(6);
+        onMapClickRef.current && onMapClickRef.current({lat,lng});
+      });
+    }
+  },[clickable]);
 
   useEffect(()=>{
     if(!mapRef.current||!hasMapsKey()) return;
@@ -645,27 +661,33 @@ function Dashboard({houses,session,myHouse,nav,emergency,incidents,infra}){
 function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,onMapClick}){
   const [tab,setTab]=useState('fincas');
   const [showInfra,setShowInfra]=useState(true);
-  const [clickMode,setClickMode]=useState(null); // 'house' | 'infra' | null
+  const [clickMode,setClickMode]=useState(false);
 
-  const handleMapClick=ll=>{
-    if(clickMode==='house'){ onMapClick(ll); setClickMode(null); }
-  };
+  const handleMapClick=useCallback(ll=>{
+    if(!clickMode) return;
+    onMapClick(ll);
+    setClickMode(false);
+  },[clickMode,onMapClick]);
 
   return(<>
     <div style={{marginBottom:'.75rem',display:'flex',gap:'.5rem',flexWrap:'wrap',justifyContent:'space-between',alignItems:'center'}}>
       <p style={{fontSize:'.83rem',color:'var(--txm)'}}>Sango Parte Alta — Guarne, Antioquia</p>
       <div style={{display:'flex',gap:6}}>
-        <button className="btn btn-s btn-sm" onClick={()=>{ setClickMode('house'); }} style={clickMode==='house'?{background:'var(--sky0)',borderColor:'var(--sky)',color:'var(--sky)'}:{}}>
-          {clickMode==='house'?'🖱️ Toque el mapa':'📍 Ubicar finca'}
-        </button>
-        <button className="btn btn-s btn-sm" onClick={onRegisterInfra}>📹 Agregar infraestructura</button>
+        {!clickMode
+          ? <button className="btn btn-p btn-sm" onClick={()=>setClickMode(true)}>📍 {myHouse?'Mover mi finca':'Ubicar mi finca'}</button>
+          : <button className="btn btn-d btn-sm" onClick={()=>setClickMode(false)}>✕ Cancelar</button>
+        }
+        <button className="btn btn-s btn-sm" onClick={onRegisterInfra}>📹 Infraestructura</button>
       </div>
     </div>
 
-    {!hasMapsKey()&&(
-      <div className="banner warn" style={{marginBottom:'.75rem'}}>
-        <span className="ico">🗺️</span>
-        <div className="txt"><p>Mapa en modo básico</p><span>Para ver marcadores sobre el mapa real, agregue su clave de Google Maps API. Por ahora se muestra la vista satelital sin marcadores interactivos.</span></div>
+    {clickMode&&(
+      <div className="banner info" style={{marginBottom:'.75rem'}}>
+        <span className="ico">👆</span>
+        <div className="txt">
+          <p>Toque el punto exacto de su finca en el mapa</p>
+          <span>El cursor cambia a una cruz. Toque el mapa donde está su propiedad y se abrirá el formulario con las coordenadas ya llenadas.</span>
+        </div>
       </div>
     )}
 
@@ -676,7 +698,12 @@ function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,o
       </label>
     </div>
 
-    <GMap houses={houses} infra={infra} showInfra={showInfra} onMapClick={handleMapClick} clickable={clickMode==='house'}/>
+    <GMap houses={houses} infra={infra} showInfra={showInfra} onMapClick={handleMapClick} clickable={clickMode}/>
+
+    <div className="banner info" style={{marginBottom:'.75rem'}}>
+      <span className="ico">💡</span>
+      <div className="txt"><p>¿No tiene coordenadas GPS?</p><span>Use el botón "📍 Ubicar mi finca" y toque el mapa, o ingrese las coordenadas manualmente en el formulario (Google Maps → mantener presionado sobre su finca).</span></div>
+    </div>
 
     <div className="map-tabs">
       {['fincas','infra'].map(t=><button key={t} className={`map-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>{t==='fincas'?`🏡 Fincas (${houses.length})`:`📹 Infraestructura (${infra.length})`}</button>)}
