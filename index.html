@@ -617,7 +617,7 @@ function App(){
           {!isGuest&&view==='infra'&&<InfraView infra={infra} session={session} onAdd={()=>setModal({type:'infra',item:null})} onEdit={item=>setModal({type:'infra',item})} onDelete={deleteInfra}/>}
           {!isGuest&&view==='alert'&&<AlertView session={session} myHouse={myHouse} addIncident={addIncident} users={users}/>}
           {!isGuest&&view==='incidents'&&<IncidentsView incidents={incidents}/>}
-          {!isGuest&&view==='profile'&&<ProfileView session={session} persistUser={persistUser} houses={houses} persistHouse={persistHouse}/>}
+          {!isGuest&&view==='profile'&&<ProfileView session={session} persistUser={persistUser} houses={houses} persistHouse={persistHouse} users={users}/>}
           {view==='admin_reg'&&session.role==='admin'&&<AdminReg houses={houses} users={users} deleteHouse={deleteHouse} persistHouse={async d=>{ setHouses(p=>p.find(h=>h.id===d.id)?p.map(h=>h.id===d.id?d:h):[...p,d]); if(fbOk) await fbSet('sango_houses',d.id,d); }}/>}
           {view==='admin_em'&&session.role==='admin'&&<AdminEmergency emergency={emergency} persist={persistEmergency}/>}
           {view==='admin_proto'&&session.role==='admin'&&<AdminProtocol protocols={protocols} persist={persistProtocol}/>}
@@ -961,18 +961,19 @@ function InfraModal({onClose,onSave,session,existing,preLatLng}){
 }
 
 /* ══ PROFILE VIEW ══ */
-function ProfileView({session,persistUser,houses,persistHouse}){
+function ProfileView({session,persistUser,houses,persistHouse,users}){
   const [form,setForm]=useState({name:session.name,phone:session.phone||'',username:session.username,password:'',newPassword:''});
   const [savedUser,setSavedUser]=useState(false);
   const [savedHouse,setSavedHouse]=useState(false);
   const [err,setErr]=useState('');
+  const [showAssoc,setShowAssoc]=useState(false);
   const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
   const initials=n=>n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 
-  // My house
   const myHouse=houses.find(h=>h.userId===session.id);
+
   const initRes=()=>{
-    if(myHouse?.residents) return myHouse.residents;
+    if(myHouse?.residents) return myHouse.residents.map(r=>({...r}));
     if(myHouse?.owner) return [{name:myHouse.owner,phone:myHouse.phones?.[0]||''},...(myHouse.phones?.slice(1)||[]).map(p=>({name:'',phone:p}))];
     return [{name:session.name,phone:session.phone||''}];
   };
@@ -983,6 +984,19 @@ function ProfileView({session,persistUser,houses,persistHouse}){
   });
   const setH=k=>e=>setHForm(f=>({...f,[k]:e.target.value}));
   const setRes=(i,k,v)=>setHForm(f=>{const r=[...f.residents];r[i]={...r[i],[k]:v};return{...f,residents:r};});
+
+  // Users NOT already in residents (by phone match) and not self
+  const linkedPhones=new Set(hForm.residents.map(r=>r.phone).filter(Boolean));
+  const availableUsers=users.filter(u=>
+    u.id!==session.id &&
+    u.phone &&
+    !linkedPhones.has(u.phone)
+  );
+
+  const associateUser=(u)=>{
+    setHForm(f=>({...f,residents:[...f.residents,{name:u.name,phone:u.phone,userId:u.id}]}));
+    setShowAssoc(false);
+  };
 
   const saveUser=async()=>{
     if(!form.name){setErr('El nombre es obligatorio.');return;}
@@ -1053,20 +1067,55 @@ function ProfileView({session,persistUser,houses,persistHouse}){
 
         {/* Residents */}
         <div className="field">
-          <label>Personas responsables</label>
-          {hForm.residents.map((r,i)=>(
-            <div key={i} style={{background:'var(--bg)',borderRadius:6,padding:'.55rem .7rem',marginBottom:'.4rem',border:'1px solid var(--bdr)'}}>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                <span className="badge gray">Persona {i+1}{i===0?' (principal)':''}</span>
-                {hForm.residents.length>1&&<button style={{background:'none',border:'none',cursor:'pointer',color:'var(--red)',fontSize:'1rem'}} onClick={()=>setHForm(f=>({...f,residents:f.residents.filter((_,idx)=>idx!==i)}))}>×</button>}
+          <label>Personas responsables / habitantes</label>
+
+          {hForm.residents.map((r,i)=>{
+            const linkedUser = r.userId ? users.find(u=>u.id===r.userId) : users.find(u=>u.phone===r.phone&&u.id!==session.id);
+            return(
+              <div key={i} style={{background:'var(--bg)',borderRadius:6,padding:'.55rem .7rem',marginBottom:'.4rem',border:'1px solid var(--bdr)'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4,flexWrap:'wrap',gap:4}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span className="badge gray">Persona {i+1}{i===0?' (principal)':''}</span>
+                    {linkedUser&&<span className="badge green" style={{fontSize:'.65rem'}}>✅ Usuario registrado</span>}
+                  </div>
+                  {hForm.residents.length>1&&<button style={{background:'none',border:'none',cursor:'pointer',color:'var(--red)',fontSize:'1rem'}} onClick={()=>setHForm(f=>({...f,residents:f.residents.filter((_,idx)=>idx!==i)}))}>×</button>}
+                </div>
+                <div className="form-row">
+                  <div className="field" style={{marginBottom:0}}><label>Nombre</label><input value={r.name} onChange={e=>setRes(i,'name',e.target.value)} placeholder="Juan Pérez"/></div>
+                  <div className="field" style={{marginBottom:0}}><label>Teléfono</label><input value={r.phone} onChange={e=>setRes(i,'phone',e.target.value)} placeholder="310..." inputMode="tel"/></div>
+                </div>
+                {linkedUser&&<p style={{fontSize:'.72rem',color:'var(--g7)',marginTop:4}}>👤 Vinculado a la cuenta de {linkedUser.name} (@{linkedUser.username})</p>}
               </div>
-              <div className="form-row">
-                <div className="field" style={{marginBottom:0}}><label>Nombre</label><input value={r.name} onChange={e=>setRes(i,'name',e.target.value)} placeholder="Juan Pérez"/></div>
-                <div className="field" style={{marginBottom:0}}><label>Teléfono</label><input value={r.phone} onChange={e=>setRes(i,'phone',e.target.value)} placeholder="310..." inputMode="tel"/></div>
-              </div>
+            );
+          })}
+
+          <div style={{display:'flex',gap:6,marginTop:'.3rem'}}>
+            <button className="btn-add" style={{flex:1}} onClick={()=>setHForm(f=>({...f,residents:[...f.residents,{name:'',phone:''}]}))}>
+              + Agregar persona manualmente
+            </button>
+            {availableUsers.length>0&&(
+              <button className="btn-add" style={{flex:1,borderColor:'var(--g4)',color:'var(--g7)'}} onClick={()=>setShowAssoc(a=>!a)}>
+                👥 {showAssoc?'Cerrar':'Asociar usuario registrado'}
+              </button>
+            )}
+          </div>
+
+          {/* Associate registered user picker */}
+          {showAssoc&&(
+            <div style={{background:'var(--g0)',border:'1px solid var(--g2)',borderRadius:'var(--r8)',padding:'.7rem',marginTop:'.5rem'}}>
+              <p style={{fontSize:'.78rem',fontWeight:500,color:'var(--g7)',marginBottom:'.5rem'}}>Seleccione un vecino ya registrado en el frente:</p>
+              {availableUsers.map(u=>(
+                <div key={u.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--surf)',border:'1px solid var(--bdr)',borderRadius:6,padding:'.55rem .75rem',marginBottom:4}}>
+                  <div>
+                    <p style={{fontWeight:500,fontSize:'.85rem'}}>{u.name}</p>
+                    <p style={{fontSize:'.75rem',color:'var(--txm)'}}>@{u.username} · {u.phone||'Sin teléfono'}</p>
+                  </div>
+                  <button className="btn btn-p btn-sm" onClick={()=>associateUser(u)}>+ Agregar</button>
+                </div>
+              ))}
+              {availableUsers.length===0&&<p style={{fontSize:'.78rem',color:'var(--txm)'}}>Todos los usuarios registrados ya están en esta finca.</p>}
             </div>
-          ))}
-          <button className="btn-add" onClick={()=>setHForm(f=>({...f,residents:[...f.residents,{name:'',phone:''}]}))}>+ Agregar persona</button>
+          )}
         </div>
 
         {/* GPS */}
