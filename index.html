@@ -525,12 +525,21 @@ function App(){
         return false;
       }}
       onNewUser={async d=>{ const nu={id:'u'+Date.now(),...d,role:'user'}; setUsers(p=>[...p,nu]); if(fbOk) await fbSet('sango_users',nu.id,nu); setSession(nu); }}
+      onGuest={()=>setSession({id:'guest',name:'Visitante',role:'guest'})}
     />
   );
 
   const myHouse=houses.find(h=>h.userId===session.id);
+  const isGuest = session.role==='guest';
   const TITLES={dashboard:'Inicio',map:'Mapa del frente',emergency:'Emergencias',protocol:'Protocolo de seguridad',search:'Buscar finca / persona',alert:'Enviar alerta',incidents:'Historial de alertas',infra:'Infraestructura de seguridad',profile:'Mi perfil',admin_reg:'Registro de fincas',admin_em:'Editar emergencias',admin_proto:'Editar protocolos',admin_users:'Gestionar usuarios'};
-  const NAV=[
+
+  // Guest only sees these 3 views
+  const GUEST_NAV=[
+    {id:'map',label:'Mapa del frente',Icon:I.map},
+    {id:'emergency',label:'Emergencias',Icon:I.phone},
+    {id:'protocol',label:'Protocolos',Icon:I.shield},
+  ];
+  const NAV=isGuest?GUEST_NAV:[
     {id:'dashboard',label:'Inicio',Icon:I.home},
     {id:'map',label:'Mapa del frente',Icon:I.map},
     {id:'emergency',label:'Emergencias',Icon:I.phone},
@@ -547,6 +556,11 @@ function App(){
     {id:'admin_proto',label:'Editar protocolos',Icon:I.edit},
     {id:'admin_users',label:'Gestionar usuarios',Icon:I.users},
   ];
+
+  // Redirect guest if they land on restricted view
+  useEffect(()=>{
+    if(isGuest&&!['map','emergency','protocol'].includes(view)) setView('map');
+  },[isGuest,view]);
 
   return(
     <div className="app">
@@ -584,16 +598,27 @@ function App(){
           </div>
         </div>
         <div className="page">
-          {view==='dashboard'&&<Dashboard houses={houses} session={session} myHouse={myHouse} nav={nav} emergency={emergency} incidents={incidents} infra={infra}/>}
-          {view==='map'&&<MapView houses={houses} infra={infra} session={session} myHouse={myHouse} onRegisterHouse={()=>setModal('house')} onRegisterInfra={()=>setModal({type:'infra',item:null})} onMapClick={(ll,mode)=>{ setPendingLatLng(ll); setModal(mode==='infra'?{type:'infra',item:null}:'house'); }} onEditInfra={item=>setModal({type:'infra',item})}/>}
+          {/* Banner modo visitante */}
+          {isGuest&&(
+            <div className="banner warn" style={{marginBottom:'.9rem'}}>
+              <span className="ico">👁️</span>
+              <div className="txt">
+                <p>Estás en modo visitante — solo lectura</p>
+                <span>Puedes ver el mapa, emergencias y protocolos. Para enviar alertas y registrar tu finca, crea una cuenta.</span>
+                <button className="btn btn-p" style={{marginTop:'.5rem'}} onClick={()=>logout()}>Crear cuenta / Ingresar</button>
+              </div>
+            </div>
+          )}
+          {view==='dashboard'&&!isGuest&&<Dashboard houses={houses} session={session} myHouse={myHouse} nav={nav} emergency={emergency} incidents={incidents} infra={infra}/>}
+          {view==='map'&&<MapView houses={houses} infra={infra} session={session} myHouse={myHouse} onRegisterHouse={()=>!isGuest&&setModal('house')} onRegisterInfra={()=>!isGuest&&setModal({type:'infra',item:null})} onMapClick={(ll,mode)=>{ if(isGuest)return; setPendingLatLng(ll); setModal(mode==='infra'?{type:'infra',item:null}:'house'); }} onEditInfra={item=>!isGuest&&setModal({type:'infra',item})} isGuest={isGuest}/>}
           {view==='emergency'&&<EmergencyView numbers={emergency}/>}
           {view==='protocol'&&<ProtocolView protocols={protocols}/>}
-          {view==='search'&&<SearchView searchQ={searchQ} setSearchQ={setSearchQ} searchR={searchR} setSearchR={setSearchR} houses={houses} infra={infra} nav={nav}/>}
-          {view==='infra'&&<InfraView infra={infra} session={session} onAdd={()=>setModal({type:'infra',item:null})} onEdit={item=>setModal({type:'infra',item})} onDelete={deleteInfra}/>}
-          {view==='alert'&&<AlertView session={session} myHouse={myHouse} addIncident={addIncident} users={users}/>}
-          {view==='incidents'&&<IncidentsView incidents={incidents}/>}
-          {view==='profile'&&<ProfileView session={session} persistUser={persistUser}/>}
-          {view==='admin_reg'&&session.role==='admin'&&<AdminReg houses={houses} users={users} deleteHouse={deleteHouse}/>}
+          {!isGuest&&view==='search'&&<SearchView searchQ={searchQ} setSearchQ={setSearchQ} searchR={searchR} setSearchR={setSearchR} houses={houses} infra={infra} nav={nav}/>}
+          {!isGuest&&view==='infra'&&<InfraView infra={infra} session={session} onAdd={()=>setModal({type:'infra',item:null})} onEdit={item=>setModal({type:'infra',item})} onDelete={deleteInfra}/>}
+          {!isGuest&&view==='alert'&&<AlertView session={session} myHouse={myHouse} addIncident={addIncident} users={users}/>}
+          {!isGuest&&view==='incidents'&&<IncidentsView incidents={incidents}/>}
+          {!isGuest&&view==='profile'&&<ProfileView session={session} persistUser={persistUser} houses={houses} persistHouse={persistHouse}/>}
+          {view==='admin_reg'&&session.role==='admin'&&<AdminReg houses={houses} users={users} deleteHouse={deleteHouse} persistHouse={async d=>{ setHouses(p=>p.find(h=>h.id===d.id)?p.map(h=>h.id===d.id?d:h):[...p,d]); if(fbOk) await fbSet('sango_houses',d.id,d); }}/>}
           {view==='admin_em'&&session.role==='admin'&&<AdminEmergency emergency={emergency} persist={persistEmergency}/>}
           {view==='admin_proto'&&session.role==='admin'&&<AdminProtocol protocols={protocols} persist={persistProtocol}/>}
           {view==='admin_users'&&session.role==='admin'&&<AdminUsers users={users} session={session} persistUser={persistUser} deleteUser={deleteUser}/>}
@@ -605,16 +630,25 @@ function App(){
 
       {/* ── Barra de navegación inferior (solo móvil) ── */}
       <nav className="bottom-nav">
-        {[
-          {id:'dashboard', label:'Inicio',  icon:<I.home/>},
-          {id:'map',       label:'Mapa',    icon:<I.map/>},
-          {id:'alert',     label:'Alerta',  icon:<I.alert/>, dot:true},
-          {id:'infra',     label:'Cámaras', icon:<I.camera/>},
-          {id:'_menu',     label:'Menú ☰',  icon:<I.menu/>},
+        {isGuest ? [
+          {id:'map',      label:'Mapa',        icon:<I.map/>},
+          {id:'emergency',label:'Emergencias', icon:<I.phone/>},
+          {id:'protocol', label:'Protocolos',  icon:<I.shield/>},
+          {id:'_login',   label:'Ingresar',    icon:<I.user/>},
+        ] : [
+          {id:'dashboard',label:'Inicio',  icon:<I.home/>},
+          {id:'map',      label:'Mapa',    icon:<I.map/>},
+          {id:'alert',    label:'Alerta',  icon:<I.alert/>, dot:true},
+          {id:'infra',    label:'Cámaras', icon:<I.camera/>},
+          {id:'_menu',    label:'Menú ☰',  icon:<I.menu/>},
         ].map(item=>(
           <button key={item.id}
             className={`bn-item ${view===item.id?'active':''}`}
-            onClick={()=>{ if(item.id==='_menu') setSbOpen(o=>!o); else nav(item.id); }}
+            onClick={()=>{
+              if(item.id==='_menu') setSbOpen(o=>!o);
+              else if(item.id==='_login') logout();
+              else nav(item.id);
+            }}
           >
             {item.dot&&<span className="bn-alert"/>}
             {item.icon}
@@ -627,7 +661,7 @@ function App(){
 }
 
 /* ══ LOGIN ══ */
-function LoginPage({users,onLogin,onNewUser}){
+function LoginPage({users,onLogin,onNewUser,onGuest}){
   const [tab,setTab]=useState('login');
   const [u,setU]=useState('');const [p,setP]=useState('');const [err,setErr]=useState('');
   const [remember,setRemember]=useState(false);
@@ -669,6 +703,24 @@ function LoginPage({users,onLogin,onNewUser}){
             <button className="btn btn-p btn-full" type="submit">Crear cuenta</button>
           </form>
         )}
+        {/* Modo visitante */}
+        <div style={{textAlign:'center',marginTop:'1.2rem'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:'.75rem'}}>
+            <div style={{flex:1,height:'1px',background:'var(--bdr)'}}/>
+            <span style={{fontSize:'.75rem',color:'var(--txm)'}}>o</span>
+            <div style={{flex:1,height:'1px',background:'var(--bdr)'}}/>
+          </div>
+          <button
+            className="btn btn-s btn-full"
+            onClick={onGuest}
+            style={{justifyContent:'center',gap:8}}
+          >
+            👁️ Ingresar como visitante
+          </button>
+          <p style={{fontSize:'.72rem',color:'var(--txm)',marginTop:'.5rem',lineHeight:1.5}}>
+            Solo lectura — mapa, emergencias y protocolos. Sin alertas ni datos privados.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -909,21 +961,50 @@ function InfraModal({onClose,onSave,session,existing,preLatLng}){
 }
 
 /* ══ PROFILE VIEW ══ */
-function ProfileView({session,persistUser}){
+function ProfileView({session,persistUser,houses,persistHouse}){
   const [form,setForm]=useState({name:session.name,phone:session.phone||'',username:session.username,password:'',newPassword:''});
-  const [saved,setSaved]=useState(false);
+  const [savedUser,setSavedUser]=useState(false);
+  const [savedHouse,setSavedHouse]=useState(false);
   const [err,setErr]=useState('');
   const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
   const initials=n=>n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const save=async()=>{
-    if(!form.name){setErr('El nombre es obligatorio.');return;}
-    if(form.newPassword&&form.newPassword.length<4){setErr('La nueva contraseña debe tener al menos 4 caracteres.');return;}
-    const updated={...session,name:form.name,phone:form.phone,username:form.username};
-    if(form.newPassword) updated.password=form.newPassword;
-    await persistUser(updated);
-    setSaved(true); setErr('');
-    setTimeout(()=>setSaved(false),3000);
+
+  // My house
+  const myHouse=houses.find(h=>h.userId===session.id);
+  const initRes=()=>{
+    if(myHouse?.residents) return myHouse.residents;
+    if(myHouse?.owner) return [{name:myHouse.owner,phone:myHouse.phones?.[0]||''},...(myHouse.phones?.slice(1)||[]).map(p=>({name:'',phone:p}))];
+    return [{name:session.name,phone:session.phone||''}];
   };
+  const [hForm,setHForm]=useState({
+    name:myHouse?.name||'',type:myHouse?.type||'finca',
+    description:myHouse?.description||'',lat:myHouse?.lat||'',lng:myHouse?.lng||'',
+    residents:initRes(),
+  });
+  const setH=k=>e=>setHForm(f=>({...f,[k]:e.target.value}));
+  const setRes=(i,k,v)=>setHForm(f=>{const r=[...f.residents];r[i]={...r[i],[k]:v};return{...f,residents:r};});
+
+  const saveUser=async()=>{
+    if(!form.name){setErr('El nombre es obligatorio.');return;}
+    if(form.newPassword&&form.newPassword.length<4){setErr('La contraseña debe tener al menos 4 caracteres.');return;}
+    const u={...session,name:form.name,phone:form.phone,username:form.username};
+    if(form.newPassword) u.password=form.newPassword;
+    await persistUser(u);
+    setSavedUser(true); setErr('');
+    setTimeout(()=>setSavedUser(false),3000);
+  };
+
+  const saveHouse=async()=>{
+    if(!hForm.name){setErr('El nombre de la finca es obligatorio.');return;}
+    const cleanRes=hForm.residents.filter(r=>r.name||r.phone);
+    const phones=cleanRes.map(r=>r.phone).filter(Boolean);
+    const owner=cleanRes[0]?.name||session.name;
+    const id=myHouse?.id||('h'+Date.now());
+    await persistHouse({...hForm,id,owner,phones,residents:cleanRes,userId:session.id,registeredAt:myHouse?.registeredAt||new Date().toISOString().slice(0,10)});
+    setSavedHouse(true); setErr('');
+    setTimeout(()=>setSavedHouse(false),3000);
+  };
+
   return(<>
     <div className="profile-card">
       <div className="profile-av">{initials(form.name||session.name)}</div>
@@ -933,23 +1014,76 @@ function ProfileView({session,persistUser}){
         <p style={{fontSize:'.78rem',color:'var(--txm)',marginTop:3}}>{form.username}</p>
       </div>
     </div>
+
     {err&&<div className="banner err" style={{marginBottom:'.9rem'}}><span className="ico">⚠️</span><div className="txt"><p>{err}</p></div></div>}
-    {saved&&<div className="banner info" style={{marginBottom:'.9rem'}}><span className="ico">✅</span><div className="txt"><p>Perfil actualizado correctamente</p></div></div>}
-    <div className="card"><div className="card-hdr"><h3>Información personal</h3></div><div className="card-body">
-      <div className="field"><label>Nombre completo *</label><input value={form.name} onChange={set('name')} placeholder="Juan Pérez"/></div>
-      <div className="form-row">
-        <div className="field"><label>Usuario</label><input value={form.username} onChange={set('username')} placeholder="juanperez"/></div>
-        <div className="field"><label>Teléfono WhatsApp</label><input value={form.phone} onChange={set('phone')} placeholder="310..." inputMode="tel"/></div>
+
+    {/* ── Datos personales ── */}
+    <div className="card">
+      <div className="card-hdr"><h3>👤 Información personal</h3>{savedUser&&<span className="badge green">✅ Guardado</span>}</div>
+      <div className="card-body">
+        <div className="field"><label>Nombre completo *</label><input value={form.name} onChange={set('name')} placeholder="Juan Pérez"/></div>
+        <div className="form-row">
+          <div className="field"><label>Usuario</label><input value={form.username} onChange={set('username')} placeholder="juanperez"/></div>
+          <div className="field"><label>Teléfono WhatsApp</label><input value={form.phone} onChange={set('phone')} placeholder="310..." inputMode="tel"/></div>
+        </div>
+        <div className="divider"/>
+        <p style={{fontSize:'.78rem',fontWeight:500,color:'var(--txs)',marginBottom:'.6rem'}}>Cambiar contraseña</p>
+        <div className="form-row">
+          <div className="field"><label>Contraseña actual</label><input type="password" value={form.password} onChange={set('password')} placeholder="••••••••"/></div>
+          <div className="field"><label>Nueva contraseña</label><input type="password" value={form.newPassword} onChange={set('newPassword')} placeholder="••••••••"/></div>
+        </div>
+        <p style={{fontSize:'.73rem',color:'var(--txm)',marginBottom:'.75rem'}}>Deje en blanco si no desea cambiar la contraseña.</p>
+        <button className="btn btn-p btn-full" onClick={saveUser}>💾 Guardar datos personales</button>
       </div>
-    </div></div>
-    <div className="card"><div className="card-hdr"><h3>Cambiar contraseña</h3></div><div className="card-body">
-      <div className="form-row">
-        <div className="field"><label>Contraseña actual</label><input type="password" value={form.password} onChange={set('password')} placeholder="••••••••"/></div>
-        <div className="field"><label>Nueva contraseña</label><input type="password" value={form.newPassword} onChange={set('newPassword')} placeholder="••••••••"/></div>
+    </div>
+
+    {/* ── Mi finca ── */}
+    <div className="card">
+      <div className="card-hdr"><h3>🏡 Mi finca / propiedad</h3>{savedHouse&&<span className="badge green">✅ Guardado</span>}</div>
+      <div className="card-body">
+        {!myHouse&&<div className="banner warn" style={{marginBottom:'.9rem'}}><span className="ico">📍</span><div className="txt"><p>Aún no tiene una finca registrada</p><span>Complete el formulario y guarde para aparecer en el mapa del frente.</span></div></div>}
+        <div className="form-row">
+          <div className="field"><label>Nombre de la finca *</label><input value={hForm.name} onChange={setH('name')} placeholder="Finca La Montaña"/></div>
+          <div className="field"><label>Tipo</label>
+            <select value={hForm.type} onChange={setH('type')}>
+              {['finca','parcela','casa','lote'].map(t=><option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Residents */}
+        <div className="field">
+          <label>Personas responsables</label>
+          {hForm.residents.map((r,i)=>(
+            <div key={i} style={{background:'var(--bg)',borderRadius:6,padding:'.55rem .7rem',marginBottom:'.4rem',border:'1px solid var(--bdr)'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                <span className="badge gray">Persona {i+1}{i===0?' (principal)':''}</span>
+                {hForm.residents.length>1&&<button style={{background:'none',border:'none',cursor:'pointer',color:'var(--red)',fontSize:'1rem'}} onClick={()=>setHForm(f=>({...f,residents:f.residents.filter((_,idx)=>idx!==i)}))}>×</button>}
+              </div>
+              <div className="form-row">
+                <div className="field" style={{marginBottom:0}}><label>Nombre</label><input value={r.name} onChange={e=>setRes(i,'name',e.target.value)} placeholder="Juan Pérez"/></div>
+                <div className="field" style={{marginBottom:0}}><label>Teléfono</label><input value={r.phone} onChange={e=>setRes(i,'phone',e.target.value)} placeholder="310..." inputMode="tel"/></div>
+              </div>
+            </div>
+          ))}
+          <button className="btn-add" onClick={()=>setHForm(f=>({...f,residents:[...f.residents,{name:'',phone:''}]}))}>+ Agregar persona</button>
+        </div>
+
+        {/* GPS */}
+        <div style={{background:'var(--g0)',border:'1px solid var(--g2)',borderRadius:'var(--r8)',padding:'.65rem',marginBottom:'.9rem'}}>
+          <p style={{fontSize:'.75rem',fontWeight:500,color:'var(--g7)',marginBottom:'.35rem'}}>📍 Coordenadas GPS</p>
+          <p style={{fontSize:'.7rem',color:'var(--txm)',marginBottom:'.45rem',lineHeight:1.5}}>Google Maps → mantenga presionado sobre su finca → copie los números.</p>
+          <div className="form-row">
+            <div className="field" style={{marginBottom:0}}><label>Latitud</label><input value={hForm.lat} onChange={setH('lat')} placeholder="6.2948" inputMode="decimal"/></div>
+            <div className="field" style={{marginBottom:0}}><label>Longitud</label><input value={hForm.lng} onChange={setH('lng')} placeholder="-75.4599" inputMode="decimal"/></div>
+          </div>
+          {hForm.lat&&hForm.lng&&<a href={`https://www.google.com/maps?q=${hForm.lat},${hForm.lng}`} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',marginTop:'.4rem',fontSize:'.73rem',color:'var(--sky)',textDecoration:'underline'}}>🗺️ Verificar en Google Maps</a>}
+        </div>
+
+        <div className="field"><label>Referencia de ubicación</label><textarea value={hForm.description} onChange={setH('description')} placeholder="Casa blanca, portón azul, 200m de la escuela..." rows={2}/></div>
+        <button className="btn btn-p btn-full" onClick={saveHouse}>💾 Guardar datos de finca</button>
       </div>
-      <p style={{fontSize:'.75rem',color:'var(--txm)'}}>Deje en blanco si no desea cambiar la contraseña.</p>
-    </div></div>
-    <button className="btn btn-p btn-full" onClick={save}>💾 Guardar cambios</button>
+    </div>
   </>);
 }
 
@@ -1121,29 +1255,92 @@ function IncidentsView({incidents}){
 }
 
 /* ══ ADMIN: REGISTRO ══ */
-function AdminReg({houses,users,deleteHouse}){
+function AdminReg({houses,users,deleteHouse,persistHouse}){
+  const [editingId,setEditingId]=useState(null);
+  const [eForm,setEForm]=useState({});
   const uName=id=>{const u=users.find(u=>u.id===id);return u?u.name:'Sin cuenta';};
   const csv=()=>{
     const rows=['Nombre,Propietario,Tipo,Teléfonos,Lat,Lng,Descripción,Fecha',...houses.map(h=>`"${h.name}","${h.owner}","${h.type}","${h.phones.join('/')}","${h.lat||''}","${h.lng||''}","${h.description||''}","${h.registeredAt||''}"`)].join('\n');
     const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows);a.download='sango_fincas.csv';a.click();
   };
+  const openEdit=(h)=>{
+    setEditingId(h.id);
+    const res=h.residents||(h.owner?[{name:h.owner,phone:h.phones?.[0]||''},...(h.phones?.slice(1)||[]).map(p=>({name:'',phone:p}))]:[{name:'',phone:''}]);
+    setEForm({name:h.name,type:h.type,description:h.description||'',lat:h.lat||'',lng:h.lng||'',residents:res});
+  };
+  const setE=k=>e=>setEForm(f=>({...f,[k]:e.target.value}));
+  const setERes=(i,k,v)=>setEForm(f=>{const r=[...f.residents];r[i]={...r[i],[k]:v};return{...f,residents:r};});
+  const saveEdit=async(h)=>{
+    const cleanRes=eForm.residents.filter(r=>r.name||r.phone);
+    const phones=cleanRes.map(r=>r.phone).filter(Boolean);
+    const owner=cleanRes[0]?.name||h.owner;
+    await persistHouse({...h,...eForm,owner,phones,residents:cleanRes});
+    setEditingId(null);
+  };
+
   return(<>
-    <div className="banner info" style={{marginBottom:'1rem'}}><span className="ico">📋</span><div className="txt"><p>Registro completo de propiedades del frente.</p></div></div>
-    <div className="card"><div className="card-hdr"><h3>Fincas ({houses.length})</h3><button className="btn-sm" onClick={csv}>⬇️ Exportar CSV</button></div>
-    <div className="tbl-wrap"><table>
-      <thead><tr><th>Finca</th><th>Propietario</th><th>Tipo</th><th>Teléfono</th><th>GPS</th><th>Fecha</th><th>Usuario</th><th></th></tr></thead>
-      <tbody>{houses.map(h=>(
-        <tr key={h.id}>
-          <td style={{fontWeight:500}}>{h.name}</td><td>{h.owner}</td>
-          <td><span className="badge gray">{h.type}</span></td>
-          <td>{h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip" style={{display:'inline-block',margin:'1px 2px'}}>📞 {p}</a>)}</td>
-          <td>{h.lat&&h.lng?<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" style={{color:'var(--sky)',fontSize:'.78rem'}}>Ver mapa</a>:'—'}</td>
-          <td style={{fontSize:'.75rem',color:'var(--txm)'}}>{h.registeredAt||'—'}</td>
-          <td style={{fontSize:'.78rem'}}>{uName(h.userId)}</td>
-          <td><button className="btn btn-d btn-sm" onClick={()=>{if(confirm('¿Eliminar?'))deleteHouse(h.id);}}>🗑️</button></td>
-        </tr>
-      ))}</tbody>
-    </table></div></div>
+    <div className="banner info" style={{marginBottom:'1rem'}}><span className="ico">📋</span><div className="txt"><p>Registro completo de propiedades. El coordinador puede editar cualquier entrada.</p></div></div>
+    <div style={{display:'flex',gap:8,marginBottom:'1rem',flexWrap:'wrap'}}>
+      <button className="btn-sm" onClick={csv}>⬇️ Exportar CSV</button>
+      <span style={{fontSize:'.78rem',color:'var(--txm)',alignSelf:'center'}}>{houses.length} finca(s) registrada(s)</span>
+    </div>
+    {houses.map(h=>{
+      const isEd=editingId===h.id;
+      return(
+        <div key={h.id} className="card" style={{marginBottom:'.75rem'}}>
+          <div className="card-hdr">
+            <div style={{minWidth:0}}>
+              <p style={{fontWeight:500,fontSize:'.9rem'}}>{h.name} <span className="badge gray">{h.type}</span></p>
+              <p style={{fontSize:'.78rem',color:'var(--txm)',marginTop:2}}>{h.owner} · {uName(h.userId)}</p>
+            </div>
+            <div style={{display:'flex',gap:5,flexShrink:0}}>
+              <button className="btn-sm" onClick={()=>isEd?setEditingId(null):openEdit(h)}>{isEd?'✕ Cancelar':'✏️ Editar'}</button>
+              <button className="btn btn-d btn-sm" onClick={()=>{if(confirm('¿Eliminar?'))deleteHouse(h.id);}}>🗑️</button>
+            </div>
+          </div>
+          {!isEd&&(
+            <div className="card-body" style={{paddingTop:'.65rem'}}>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:5}}>
+                {h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip">📞 {p}</a>)}
+                {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver mapa</a>}
+              </div>
+              {h.description&&<p style={{fontSize:'.78rem',color:'var(--txm)',fontStyle:'italic'}}>📍 {h.description}</p>}
+              {h.registeredAt&&<p style={{fontSize:'.72rem',color:'var(--txm)',marginTop:4}}>Registrado: {h.registeredAt}</p>}
+            </div>
+          )}
+          {isEd&&(
+            <div className="card-body">
+              <div className="form-row">
+                <div className="field"><label>Nombre *</label><input value={eForm.name} onChange={setE('name')}/></div>
+                <div className="field"><label>Tipo</label><select value={eForm.type} onChange={setE('type')}>{['finca','parcela','casa','lote'].map(t=><option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}</select></div>
+              </div>
+              <div className="field">
+                <label>Personas responsables</label>
+                {eForm.residents.map((r,i)=>(
+                  <div key={i} style={{background:'var(--bg)',borderRadius:6,padding:'.5rem .65rem',marginBottom:'.38rem',border:'1px solid var(--bdr)'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                      <span className="badge gray">Persona {i+1}{i===0?' (principal)':''}</span>
+                      {eForm.residents.length>1&&<button style={{background:'none',border:'none',cursor:'pointer',color:'var(--red)',fontSize:'.9rem'}} onClick={()=>setEForm(f=>({...f,residents:f.residents.filter((_,idx)=>idx!==i)}))}>×</button>}
+                    </div>
+                    <div className="form-row">
+                      <div className="field" style={{marginBottom:0}}><label>Nombre</label><input value={r.name} onChange={e=>setERes(i,'name',e.target.value)} placeholder="Juan Pérez"/></div>
+                      <div className="field" style={{marginBottom:0}}><label>Teléfono</label><input value={r.phone} onChange={e=>setERes(i,'phone',e.target.value)} placeholder="310..." inputMode="tel"/></div>
+                    </div>
+                  </div>
+                ))}
+                <button className="btn-add" onClick={()=>setEForm(f=>({...f,residents:[...f.residents,{name:'',phone:''}]}))}>+ Agregar persona</button>
+              </div>
+              <div className="form-row">
+                <div className="field"><label>Latitud</label><input value={eForm.lat} onChange={setE('lat')} placeholder="6.2948" inputMode="decimal"/></div>
+                <div className="field"><label>Longitud</label><input value={eForm.lng} onChange={setE('lng')} placeholder="-75.4599" inputMode="decimal"/></div>
+              </div>
+              <div className="field"><label>Referencia</label><textarea value={eForm.description} onChange={setE('description')} rows={2}/></div>
+              <button className="btn btn-p btn-full" onClick={()=>saveEdit(h)}>💾 Guardar cambios</button>
+            </div>
+          )}
+        </div>
+      );
+    })}
   </>);
 }
 
@@ -1231,14 +1428,20 @@ function AdminProtocol({protocols,persist}){
 /* ══ ADMIN: USERS ══ */
 function AdminUsers({users,session,persistUser,deleteUser}){
   const [confirm,setConfirm]=useState(null);
+  const [showPwd,setShowPwd]=useState({});
   const cu=confirm?users.find(u=>u.id===confirm.id):null;
   const doConfirm=async()=>{ if(confirm.action==='promote')await persistUser({...cu,role:'admin'}); else if(confirm.action==='demote')await persistUser({...cu,role:'user'}); else if(confirm.action==='delete')await deleteUser(cu.id); setConfirm(null); };
   const msgs={promote:`¿Designar a "${cu?.name}" como coordinador?`,demote:`¿Quitar permisos de coordinador a "${cu?.name}"?`,delete:`¿Eliminar a "${cu?.name}"? No se puede deshacer.`};
+  const togglePwd=id=>setShowPwd(p=>({...p,[id]:!p[id]}));
   return(<>
     <div className="banner info" style={{marginBottom:'1rem'}}><span className="ico">🔑</span><div className="txt"><p>Gestión de roles y accesos</p><span>Puede haber varios coordinadores — uno por sector de la vereda.</span></div></div>
+    <div className="banner warn" style={{marginBottom:'1rem'}}>
+      <span className="ico">👁️</span>
+      <div className="txt"><p>Contraseñas visibles para soporte</p><span>Si un vecino olvidó su contraseña, toque el ícono 👁️ en su fila para verla y comunicársela. Mantenga esta información con discreción.</span></div>
+    </div>
     <div className="card"><div className="card-hdr"><h3>Usuarios ({users.length})</h3><span className="badge amber">{users.filter(u=>u.role==='admin').length} coordinador(es)</span></div>
     <div className="tbl-wrap"><table>
-      <thead><tr><th>Nombre</th><th>Usuario</th><th>Teléfono</th><th>Rol</th><th>Acciones</th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Usuario</th><th>Contraseña</th><th>Teléfono</th><th>Rol</th><th>Acciones</th></tr></thead>
       <tbody>{users.map(u=>(
         <tr key={u.id}>
           <td><div style={{display:'flex',alignItems:'center',gap:7}}>
@@ -1246,6 +1449,19 @@ function AdminUsers({users,session,persistUser,deleteUser}){
             <span style={{fontWeight:500}}>{u.name}</span>{u.id===session.id&&<span className="badge sky" style={{fontSize:'.63rem'}}>yo</span>}
           </div></td>
           <td style={{color:'var(--txm)',fontSize:'.8rem'}}>{u.username}</td>
+          <td>
+            <div style={{display:'flex',alignItems:'center',gap:5}}>
+              <span style={{fontFamily:'monospace',fontSize:'.8rem',color:'var(--txs)',letterSpacing:showPwd[u.id]?'.05em':'.12em'}}>
+                {showPwd[u.id] ? u.password : '•'.repeat(Math.min(u.password?.length||6,8))}
+              </span>
+              <button
+                className="btn-sm"
+                title={showPwd[u.id]?'Ocultar':'Ver contraseña'}
+                onClick={()=>togglePwd(u.id)}
+                style={{padding:'2px 6px',fontSize:'.8rem'}}
+              >{showPwd[u.id]?'🙈':'👁️'}</button>
+            </div>
+          </td>
           <td>{u.phone?<a href={`tel:${u.phone}`} className="pchip">📞 {u.phone}</a>:'—'}</td>
           <td><span className={`badge ${u.role==='admin'?'amber':'green'}`}>{u.role==='admin'?'⭐ Coordinador':'Habitante'}</span></td>
           <td>{u.id!==session.id?(
