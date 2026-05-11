@@ -639,7 +639,7 @@ function App(){
           {id:'dashboard',label:'Inicio',  icon:<I.home/>},
           {id:'map',      label:'Mapa',    icon:<I.map/>},
           {id:'alert',    label:'Alerta',  icon:<I.alert/>, dot:true},
-          {id:'infra',    label:'Cámaras', icon:<I.camera/>},
+          {id:'profile',  label:'Mi perfil',icon:<I.user/>},
           {id:'_menu',    label:'Menú ☰',  icon:<I.menu/>},
         ].map(item=>(
           <button key={item.id}
@@ -1307,32 +1307,132 @@ function IncidentsView({incidents}){
 function AdminReg({houses,users,deleteHouse,persistHouse}){
   const [editingId,setEditingId]=useState(null);
   const [eForm,setEForm]=useState({});
+  const [creating,setCreating]=useState(false);
+  const [cForm,setCForm]=useState({name:'',type:'finca',description:'',lat:'',lng:'',residents:[{name:'',phone:''}],userId:''});
+
   const uName=id=>{const u=users.find(u=>u.id===id);return u?u.name:'Sin cuenta';};
   const csv=()=>{
     const rows=['Nombre,Propietario,Tipo,Teléfonos,Lat,Lng,Descripción,Fecha',...houses.map(h=>`"${h.name}","${h.owner}","${h.type}","${h.phones.join('/')}","${h.lat||''}","${h.lng||''}","${h.description||''}","${h.registeredAt||''}"`)].join('\n');
     const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows);a.download='sango_fincas.csv';a.click();
   };
+
+  /* ── Create ── */
+  const setC=k=>e=>setCForm(f=>({...f,[k]:e.target.value}));
+  const setCRes=(i,k,v)=>setCForm(f=>{const r=[...f.residents];r[i]={...r[i],[k]:v};return{...f,residents:r};});
+
+  // When user is selected, pre-fill first resident from user data
+  const onUserSelect=(uid)=>{
+    const u=users.find(x=>x.id===uid);
+    if(u) setCForm(f=>({...f,userId:uid,residents:[{name:u.name,phone:u.phone||''},...f.residents.slice(1)]}));
+    else setCForm(f=>({...f,userId:uid}));
+  };
+
+  const saveNew=async()=>{
+    if(!cForm.name){return;}
+    const cleanRes=cForm.residents.filter(r=>r.name||r.phone);
+    const phones=cleanRes.map(r=>r.phone).filter(Boolean);
+    const owner=cleanRes[0]?.name||'Sin asignar';
+    const assignedUser=users.find(u=>u.id===cForm.userId);
+    await persistHouse({
+      id:'h'+Date.now(),
+      name:cForm.name, type:cForm.type,
+      description:cForm.description,
+      lat:cForm.lat, lng:cForm.lng,
+      owner, phones, residents:cleanRes,
+      userId:cForm.userId||null,
+      registeredAt:new Date().toISOString().slice(0,10),
+    });
+    setCForm({name:'',type:'finca',description:'',lat:'',lng:'',residents:[{name:'',phone:''}],userId:''});
+    setCreating(false);
+  };
+
+  /* ── Edit ── */
   const openEdit=(h)=>{
     setEditingId(h.id);
     const res=h.residents||(h.owner?[{name:h.owner,phone:h.phones?.[0]||''},...(h.phones?.slice(1)||[]).map(p=>({name:'',phone:p}))]:[{name:'',phone:''}]);
-    setEForm({name:h.name,type:h.type,description:h.description||'',lat:h.lat||'',lng:h.lng||'',residents:res});
+    setEForm({name:h.name,type:h.type,description:h.description||'',lat:h.lat||'',lng:h.lng||'',residents:res,userId:h.userId||''});
   };
   const setE=k=>e=>setEForm(f=>({...f,[k]:e.target.value}));
   const setERes=(i,k,v)=>setEForm(f=>{const r=[...f.residents];r[i]={...r[i],[k]:v};return{...f,residents:r};});
+  const onEditUserSelect=(uid)=>{
+    const u=users.find(x=>x.id===uid);
+    setEForm(f=>({...f,userId:uid,...(u?{residents:[{name:u.name,phone:u.phone||''},...f.residents.slice(1)]}:{})}));
+  };
   const saveEdit=async(h)=>{
     const cleanRes=eForm.residents.filter(r=>r.name||r.phone);
     const phones=cleanRes.map(r=>r.phone).filter(Boolean);
     const owner=cleanRes[0]?.name||h.owner;
-    await persistHouse({...h,...eForm,owner,phones,residents:cleanRes});
+    await persistHouse({...h,...eForm,owner,phones,residents:cleanRes,userId:eForm.userId||h.userId||null});
     setEditingId(null);
   };
 
-  return(<>
-    <div className="banner info" style={{marginBottom:'1rem'}}><span className="ico">📋</span><div className="txt"><p>Registro completo de propiedades. El coordinador puede editar cualquier entrada.</p></div></div>
-    <div style={{display:'flex',gap:8,marginBottom:'1rem',flexWrap:'wrap'}}>
-      <button className="btn-sm" onClick={csv}>⬇️ Exportar CSV</button>
-      <span style={{fontSize:'.78rem',color:'var(--txm)',alignSelf:'center'}}>{houses.length} finca(s) registrada(s)</span>
+  const ResidentFields=({residents,setRes,addRes})=>(
+    <div className="field">
+      <label>Personas responsables</label>
+      {residents.map((r,i)=>(
+        <div key={i} style={{background:'var(--bg)',borderRadius:6,padding:'.5rem .65rem',marginBottom:'.38rem',border:'1px solid var(--bdr)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+            <span className="badge gray">Persona {i+1}{i===0?' (principal)':''}</span>
+            {residents.length>1&&<button style={{background:'none',border:'none',cursor:'pointer',color:'var(--red)',fontSize:'.9rem'}} onClick={()=>setRes(i,null,null,'del')}>×</button>}
+          </div>
+          <div className="form-row">
+            <div className="field" style={{marginBottom:0}}><label>Nombre</label><input value={r.name} onChange={e=>setRes(i,'name',e.target.value)} placeholder="Juan Pérez"/></div>
+            <div className="field" style={{marginBottom:0}}><label>Teléfono</label><input value={r.phone} onChange={e=>setRes(i,'phone',e.target.value)} placeholder="310..." inputMode="tel"/></div>
+          </div>
+        </div>
+      ))}
+      <button className="btn-add" onClick={addRes}>+ Agregar persona</button>
     </div>
+  );
+
+  return(<>
+    <div className="banner info" style={{marginBottom:'1rem'}}><span className="ico">📋</span><div className="txt"><p>Registro completo de propiedades. Puede crear nuevas fincas y asignarlas a usuarios.</p></div></div>
+
+    {/* ── Toolbar ── */}
+    <div style={{display:'flex',gap:8,marginBottom:'1rem',flexWrap:'wrap',alignItems:'center'}}>
+      <button className="btn btn-p" onClick={()=>{setCreating(c=>!c);setEditingId(null);}}>
+        {creating?'✕ Cancelar':'🏡 Crear nueva finca'}
+      </button>
+      <button className="btn-sm" onClick={csv}>⬇️ Exportar CSV</button>
+      <span style={{fontSize:'.78rem',color:'var(--txm)',marginLeft:'auto'}}>{houses.length} finca(s)</span>
+    </div>
+
+    {/* ── Create form ── */}
+    {creating&&(
+      <div className="card" style={{marginBottom:'1rem',border:'2px solid var(--g3)'}}>
+        <div className="card-hdr"><h3>🏡 Nueva finca</h3><span className="badge green">Creando</span></div>
+        <div className="card-body">
+          {/* Assign to user */}
+          <div className="field">
+            <label>Asignar a usuario registrado</label>
+            <select value={cForm.userId} onChange={e=>onUserSelect(e.target.value)}>
+              <option value="">— Sin usuario asignado —</option>
+              {users.map(u=><option key={u.id} value={u.id}>{u.name} (@{u.username}){u.phone?` · ${u.phone}`:''}</option>)}
+            </select>
+            <p style={{fontSize:'.72rem',color:'var(--txm)',marginTop:4}}>Al asignar un usuario, él podrá ver y editar esta finca desde su perfil.</p>
+          </div>
+          <div className="divider"/>
+          <div className="form-row">
+            <div className="field"><label>Nombre *</label><input value={cForm.name} onChange={setC('name')} placeholder="Finca La Montaña"/></div>
+            <div className="field"><label>Tipo</label><select value={cForm.type} onChange={setC('type')}>{['finca','parcela','casa','lote'].map(t=><option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}</select></div>
+          </div>
+          <ResidentFields
+            residents={cForm.residents}
+            setRes={(i,k,v,op)=>{ if(op==='del') setCForm(f=>({...f,residents:f.residents.filter((_,idx)=>idx!==i)})); else setCRes(i,k,v); }}
+            addRes={()=>setCForm(f=>({...f,residents:[...f.residents,{name:'',phone:''}]}))}
+          />
+          <div className="form-row">
+            <div className="field"><label>Latitud</label><input value={cForm.lat} onChange={setC('lat')} placeholder="6.2948" inputMode="decimal"/></div>
+            <div className="field"><label>Longitud</label><input value={cForm.lng} onChange={setC('lng')} placeholder="-75.4599" inputMode="decimal"/></div>
+          </div>
+          {cForm.lat&&cForm.lng&&<a href={`https://www.google.com/maps?q=${cForm.lat},${cForm.lng}`} target="_blank" rel="noopener noreferrer" style={{fontSize:'.73rem',color:'var(--sky)',textDecoration:'underline',display:'inline-block',marginBottom:'.6rem'}}>🗺️ Verificar en Google Maps</a>}
+          <div className="field"><label>Referencia de ubicación</label><textarea value={cForm.description} onChange={setC('description')} placeholder="Casa blanca, portón azul, 200m de la escuela..." rows={2}/></div>
+          <button className="btn btn-p btn-full" onClick={saveNew}>💾 Guardar nueva finca</button>
+        </div>
+      </div>
+    )}
+
+    {/* ── Existing houses ── */}
     {houses.map(h=>{
       const isEd=editingId===h.id;
       return(
@@ -1340,10 +1440,10 @@ function AdminReg({houses,users,deleteHouse,persistHouse}){
           <div className="card-hdr">
             <div style={{minWidth:0}}>
               <p style={{fontWeight:500,fontSize:'.9rem'}}>{h.name} <span className="badge gray">{h.type}</span></p>
-              <p style={{fontSize:'.78rem',color:'var(--txm)',marginTop:2}}>{h.owner} · {uName(h.userId)}</p>
+              <p style={{fontSize:'.78rem',color:'var(--txm)',marginTop:2}}>{h.owner} · <span style={{color:h.userId?'var(--g6)':'var(--amb)'}}>{h.userId?`👤 ${uName(h.userId)}`:'⚠️ Sin usuario asignado'}</span></p>
             </div>
             <div style={{display:'flex',gap:5,flexShrink:0}}>
-              <button className="btn-sm" onClick={()=>isEd?setEditingId(null):openEdit(h)}>{isEd?'✕ Cancelar':'✏️ Editar'}</button>
+              <button className="btn-sm" onClick={()=>{isEd?setEditingId(null):openEdit(h);setCreating(false);}}>{isEd?'✕ Cancelar':'✏️ Editar'}</button>
               <button className="btn btn-d btn-sm" onClick={()=>{if(confirm('¿Eliminar?'))deleteHouse(h.id);}}>🗑️</button>
             </div>
           </div>
@@ -1353,36 +1453,40 @@ function AdminReg({houses,users,deleteHouse,persistHouse}){
                 {h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip">📞 {p}</a>)}
                 {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver mapa</a>}
               </div>
+              {h.residents&&h.residents.length>1&&(
+                <p style={{fontSize:'.75rem',color:'var(--txm)',marginBottom:4}}>
+                  👥 {h.residents.map(r=>r.name).filter(Boolean).join(', ')}
+                </p>
+              )}
               {h.description&&<p style={{fontSize:'.78rem',color:'var(--txm)',fontStyle:'italic'}}>📍 {h.description}</p>}
               {h.registeredAt&&<p style={{fontSize:'.72rem',color:'var(--txm)',marginTop:4}}>Registrado: {h.registeredAt}</p>}
             </div>
           )}
           {isEd&&(
             <div className="card-body">
+              {/* Reassign user */}
+              <div className="field">
+                <label>Usuario asignado</label>
+                <select value={eForm.userId||''} onChange={e=>onEditUserSelect(e.target.value)}>
+                  <option value="">— Sin usuario asignado —</option>
+                  {users.map(u=><option key={u.id} value={u.id}>{u.name} (@{u.username})</option>)}
+                </select>
+              </div>
+              <div className="divider"/>
               <div className="form-row">
                 <div className="field"><label>Nombre *</label><input value={eForm.name} onChange={setE('name')}/></div>
                 <div className="field"><label>Tipo</label><select value={eForm.type} onChange={setE('type')}>{['finca','parcela','casa','lote'].map(t=><option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}</select></div>
               </div>
-              <div className="field">
-                <label>Personas responsables</label>
-                {eForm.residents.map((r,i)=>(
-                  <div key={i} style={{background:'var(--bg)',borderRadius:6,padding:'.5rem .65rem',marginBottom:'.38rem',border:'1px solid var(--bdr)'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
-                      <span className="badge gray">Persona {i+1}{i===0?' (principal)':''}</span>
-                      {eForm.residents.length>1&&<button style={{background:'none',border:'none',cursor:'pointer',color:'var(--red)',fontSize:'.9rem'}} onClick={()=>setEForm(f=>({...f,residents:f.residents.filter((_,idx)=>idx!==i)}))}>×</button>}
-                    </div>
-                    <div className="form-row">
-                      <div className="field" style={{marginBottom:0}}><label>Nombre</label><input value={r.name} onChange={e=>setERes(i,'name',e.target.value)} placeholder="Juan Pérez"/></div>
-                      <div className="field" style={{marginBottom:0}}><label>Teléfono</label><input value={r.phone} onChange={e=>setERes(i,'phone',e.target.value)} placeholder="310..." inputMode="tel"/></div>
-                    </div>
-                  </div>
-                ))}
-                <button className="btn-add" onClick={()=>setEForm(f=>({...f,residents:[...f.residents,{name:'',phone:''}]}))}>+ Agregar persona</button>
-              </div>
+              <ResidentFields
+                residents={eForm.residents||[]}
+                setRes={(i,k,v,op)=>{ if(op==='del') setEForm(f=>({...f,residents:f.residents.filter((_,idx)=>idx!==i)})); else setERes(i,k,v); }}
+                addRes={()=>setEForm(f=>({...f,residents:[...(f.residents||[]),{name:'',phone:''}]}))}
+              />
               <div className="form-row">
                 <div className="field"><label>Latitud</label><input value={eForm.lat} onChange={setE('lat')} placeholder="6.2948" inputMode="decimal"/></div>
                 <div className="field"><label>Longitud</label><input value={eForm.lng} onChange={setE('lng')} placeholder="-75.4599" inputMode="decimal"/></div>
               </div>
+              {eForm.lat&&eForm.lng&&<a href={`https://www.google.com/maps?q=${eForm.lat},${eForm.lng}`} target="_blank" rel="noopener noreferrer" style={{fontSize:'.73rem',color:'var(--sky)',textDecoration:'underline',display:'inline-block',marginBottom:'.6rem'}}>🗺️ Verificar en Google Maps</a>}
               <div className="field"><label>Referencia</label><textarea value={eForm.description} onChange={setE('description')} rows={2}/></div>
               <button className="btn btn-p btn-full" onClick={()=>saveEdit(h)}>💾 Guardar cambios</button>
             </div>
