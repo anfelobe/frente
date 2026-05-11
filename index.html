@@ -7,11 +7,10 @@
 
 <!-- Firebase SDK -->
 <script type="module">
-  import { initializeApp }          from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, doc, setDoc, getDoc, getDocs,
-           onSnapshot, deleteDoc, serverTimestamp, query, orderBy }
-                                    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
+  import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, doc, setDoc, onSnapshot,
+           deleteDoc, serverTimestamp, query, orderBy }
+                             from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   const firebaseConfig = {
     apiKey:            "AIzaSyA0ntQPmlfl1tiDJlmTYD6rijqABQIFuFs",
     authDomain:        "sango-seguridad-304bb.firebaseapp.com",
@@ -20,16 +19,22 @@
     messagingSenderId: "701480452366",
     appId:             "1:701480452366:web:5ff80428e37f67fb6c575f"
   };
-
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
-
-  /* ── Exponer helpers al scope global para que React los use ── */
   window._db = db;
-  window._fs = { collection, doc, setDoc, getDoc, getDocs,
-                 onSnapshot, deleteDoc, serverTimestamp, query, orderBy };
+  window._fs = { collection, doc, setDoc, onSnapshot, deleteDoc, serverTimestamp, query, orderBy };
   window._firebaseReady = true;
   window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<!-- Google Maps API -->
+<script>
+  window.MAPS_KEY = 'AIzaSyCqUdkd0HdXec79DKR9G2UAA2JuI-P_7Ps';
+  window._mapsReady = false;
+  function initMap(){ window._mapsReady = true; window.dispatchEvent(new Event('maps-ready')); }
+</script>
+<script async defer
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqUdkd0HdXec79DKR9G2UAA2JuI-P_7Ps&callback=initMap&language=es&region=CO">
 </script>
 
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -110,7 +115,8 @@ h1,h2,h3{font-family:'Fraunces',serif}
 .banner.info{background:var(--g0);border-color:var(--g2)}
 .banner.err{background:var(--red0);border-color:#f7c1c1}
 .banner p{font-size:.83rem;font-weight:500}
-.banner span{font-size:.77rem;opacity:.85;margin-top:2px;display:block}
+.banner span.ico{font-size:1.3rem;flex-shrink:0}
+.banner .txt span{font-size:.77rem;opacity:.85;margin-top:2px;display:block}
 .em-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.7rem;margin-bottom:.9rem}
 .em-card{border-radius:var(--r12);padding:.95rem 1rem;border:1px solid;display:flex;align-items:center;gap:.85rem;text-decoration:none;transition:transform .15s}
 .em-card:hover{transform:translateY(-2px)}
@@ -119,7 +125,7 @@ h1,h2,h3{font-family:'Fraunces',serif}
 .em-card.medical{background:var(--amb0);border-color:#fac775}
 .em-card.community{background:var(--g0);border-color:var(--g2)}
 .em-card.other{background:var(--pur0);border-color:#afa9ec}
-.em-ico{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem}
+.em-ico{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.3rem}
 .police .em-ico{background:var(--sky)}.fire .em-ico{background:var(--red)}
 .medical .em-ico{background:var(--amb)}.community .em-ico{background:var(--g7)}.other .em-ico{background:var(--pur)}
 .em-ico svg{width:20px;height:20px;fill:#fff}
@@ -128,9 +134,14 @@ h1,h2,h3{font-family:'Fraunces',serif}
 .police .em-num{color:var(--sky)}.fire .em-num{color:var(--red)}
 .medical .em-num{color:var(--amb)}.community .em-num{color:var(--g7)}.other .em-num{color:var(--pur)}
 .em-info small{font-size:.73rem;color:var(--txm)}
-.map-wrap{width:100%;border-radius:var(--r12);overflow:hidden;border:1px solid var(--bdr);margin-bottom:.9rem}
-.map-wrap iframe{display:block;width:100%;height:400px;border:0}
-@media(min-width:600px){.map-wrap iframe{height:480px}}
+/* MAP */
+.map-container{width:100%;height:420px;border-radius:var(--r12);overflow:hidden;border:1px solid var(--bdr);margin-bottom:.9rem;background:#e8f0e8}
+@media(min-width:600px){.map-container{height:500px}}
+.map-no-key{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;color:var(--txm);font-size:.88rem}
+.map-fallback{width:100%;height:420px;border-radius:var(--r12);overflow:hidden;border:1px solid var(--bdr);margin-bottom:.9rem}
+@media(min-width:600px){.map-fallback{height:500px}}
+.map-fallback iframe{display:block;width:100%;height:100%;border:0}
+/* PROTO */
 .proto-level{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:.73rem;font-weight:500;margin-bottom:.65rem}
 .proto-level.green{background:var(--g1);color:var(--g7)}
 .proto-level.amber{background:var(--amb0);color:var(--amb)}
@@ -141,18 +152,22 @@ h1,h2,h3{font-family:'Fraunces',serif}
 .step-b h4{font-size:.85rem;font-weight:500;margin-bottom:2px}
 .step-b p{font-size:.8rem;color:var(--txm);line-height:1.5}
 .proto-sec{margin-bottom:1.4rem}
+/* TABLE */
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;min-width:520px}
 th{text-align:left;padding:.6rem .85rem;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--txm);border-bottom:1px solid var(--bdr);background:var(--bg)}
 td{padding:.7rem .85rem;border-bottom:1px solid var(--bdr);font-size:.82rem;vertical-align:middle}
 tr:last-child td{border-bottom:none}
 tr:hover td{background:#fafcfa}
+/* BADGES */
 .badge{padding:2px 7px;border-radius:20px;font-size:.7rem;font-weight:500}
 .badge.green{background:var(--g1);color:var(--g7)}
 .badge.amber{background:var(--amb0);color:var(--amb)}
 .badge.red{background:var(--red0);color:var(--red)}
 .badge.sky{background:var(--sky0);color:var(--sky)}
 .badge.gray{background:#f1efe8;color:#5f5e5a}
+.badge.pur{background:var(--pur0);color:var(--pur)}
+/* MODAL */
 .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:flex-end;justify-content:center;padding:0}
 @media(min-width:580px){.modal-ov{align-items:center;padding:1rem}}
 .modal{background:var(--surf);border-radius:16px 16px 0 0;width:100%;max-height:92vh;overflow-y:auto}
@@ -163,6 +178,7 @@ tr:hover td{background:#fafcfa}
 .btn-x:hover{color:var(--tx);background:var(--bg)}
 .modal-body{padding:1.1rem}
 .modal-ftr{padding:.85rem 1.2rem;border-top:1px solid var(--bdr);display:flex;gap:.6rem;justify-content:flex-end}
+/* SEARCH */
 .search-bar{display:flex;gap:.55rem;margin-bottom:1rem}
 .search-bar input{flex:1;padding:.7rem .85rem;border:1.5px solid var(--bdr);border-radius:var(--r12);font-size:.88rem;font-family:'DM Sans',sans-serif;background:var(--surf);outline:none;color:var(--tx)}
 .search-bar input:focus{border-color:var(--g6)}
@@ -177,10 +193,11 @@ tr:hover td{background:#fafcfa}
 .divider{height:1px;background:var(--bdr);margin:.9rem 0}
 .empty{text-align:center;padding:2rem 1rem;color:var(--txm)}
 .empty .big{font-size:2.2rem;margin-bottom:.65rem}
-.sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:5px}
+/* SYNC */
+.sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
 .sync-dot.ok{background:#3a9944}.sync-dot.off{background:#e24b4a}.sync-dot.wait{background:#ef9f27;animation:blink .8s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-/* ALERT MODULE */
+/* ALERT */
 .alert-panel{background:var(--surf);border-radius:var(--r12);border:1px solid var(--bdr);overflow:hidden;margin-bottom:.9rem}
 .alert-levels{display:grid;grid-template-columns:repeat(3,1fr)}
 .al-btn{padding:.9rem .5rem;text-align:center;cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:500;border-bottom:3px solid transparent;transition:all .15s;color:var(--txm)}
@@ -189,13 +206,22 @@ tr:hover td{background:#fafcfa}
 .al-btn.sel.amber{color:var(--amb);border-bottom-color:var(--amb);background:var(--amb0)}
 .al-btn.sel.red{color:var(--red);border-bottom-color:var(--red);background:var(--red0)}
 .al-body{padding:1rem}
-/* INCIDENT LOG */
+/* INCIDENTS */
 .inc-row{display:flex;gap:.8rem;align-items:flex-start;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r12);padding:.85rem;margin-bottom:.55rem}
 .inc-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
 .inc-icon.green{background:var(--g1)}.inc-icon.amber{background:var(--amb0)}.inc-icon.red{background:var(--red0)}
-.inc-info h4{font-size:.85rem;font-weight:500;color:var(--tx)}
+.inc-info h4{font-size:.85rem;font-weight:500}
 .inc-info p{font-size:.77rem;color:var(--txm);line-height:1.4;margin-top:2px}
 .inc-meta{font-size:.7rem;color:var(--txm);margin-top:4px}
+/* INFRA */
+.infra-type-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.55rem;margin-bottom:1rem}
+.type-btn{padding:.7rem .5rem;text-align:center;border:1.5px solid var(--bdr);border-radius:var(--r8);cursor:pointer;background:var(--surf);font-family:'DM Sans',sans-serif;font-size:.78rem;color:var(--txs);transition:all .15s}
+.type-btn:hover,.type-btn.sel{background:var(--g0);border-color:var(--g4);color:var(--g7)}
+.type-btn .tico{font-size:1.4rem;display:block;margin-bottom:3px}
+.infra-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r12);padding:.85rem;margin-bottom:.5rem;display:flex;gap:.75rem;align-items:flex-start}
+.infra-ico{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;background:var(--pur0)}
+.infra-info h4{font-size:.85rem;font-weight:500}
+.infra-info p{font-size:.78rem;color:var(--txm);line-height:1.4;margin-top:2px}
 /* LOGIN */
 .login-page{min-height:100vh;display:flex;flex-direction:column}
 .login-hero{background:var(--g9);padding:2.2rem 1.5rem 1.8rem;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;overflow:hidden}
@@ -206,15 +232,20 @@ tr:hover td{background:#fafcfa}
 .login-hero p{font-size:.75rem;color:var(--g5);margin-top:.35rem;letter-spacing:.1em;text-transform:uppercase;font-family:'DM Sans',sans-serif;position:relative;z-index:1}
 .login-hero small{font-size:.78rem;color:var(--g4);margin-top:.8rem;line-height:1.5;max-width:280px;position:relative;z-index:1}
 .login-body{flex:1;padding:1.4rem;max-width:420px;width:100%;margin:0 auto}
-.login-body h2{font-size:1.2rem;color:var(--g9);margin-bottom:.2rem}
-.login-body p{font-size:.82rem;color:var(--txm);margin-bottom:1.3rem}
-.err-box{background:var(--red0);color:var(--red);padding:.6rem .85rem;border-radius:var(--r8);font-size:.8rem;margin-bottom:.85rem;border-left:3px solid var(--red)}
-.demo-box{font-size:.76rem;color:var(--txm);margin-top:.9rem;padding:.7rem;background:var(--g0);border-radius:var(--r8);line-height:1.7}
-.demo-box strong{color:var(--g7)}
 .tab-row{display:flex;gap:.4rem;margin-bottom:1.1rem;background:var(--bg);border-radius:var(--r8);padding:4px}
 .tab{flex:1;padding:.5rem;border:none;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:500;background:transparent;color:var(--txm);transition:all .15s}
 .tab.active{background:var(--surf);color:var(--g8)}
+.err-box{background:var(--red0);color:var(--red);padding:.6rem .85rem;border-radius:var(--r8);font-size:.8rem;margin-bottom:.85rem;border-left:3px solid var(--red)}
+.demo-box{font-size:.76rem;color:var(--txm);margin-top:.9rem;padding:.7rem;background:var(--g0);border-radius:var(--r8);line-height:1.7}
+.demo-box strong{color:var(--g7)}
 .inline-hint{font-size:.72rem;color:var(--txm);background:var(--amb0);border-radius:6px;padding:.38rem .65rem;display:inline-flex;align-items:center;gap:4px;margin-bottom:.7rem}
+/* MAP TABS */
+.map-tabs{display:flex;gap:.4rem;margin-bottom:.75rem;background:var(--bg);border-radius:var(--r8);padding:4px}
+.map-tab{flex:1;padding:.45rem;border:none;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:500;background:transparent;color:var(--txm);transition:all .15s;text-align:center}
+.map-tab.active{background:var(--surf);color:var(--g8)}
+/* PROFILE */
+.profile-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r12);padding:1.2rem;margin-bottom:.9rem;display:flex;align-items:center;gap:1rem}
+.profile-av{width:56px;height:56px;background:var(--g7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:1.2rem;color:var(--g2);flex-shrink:0}
 </style>
 </head>
 <body>
@@ -222,46 +253,24 @@ tr:hover td{background:#fafcfa}
 <script type="text/babel">
 const {useState,useEffect,useRef,useCallback} = React;
 
-/* ══ WHATSAPP CONFIG ══ */
-const WA_COORDINATOR = '573113581265'; // número del coordinador (sin + ni espacios)
+const WA_COORDINATOR = '573113581265';
+const MAP_CENTER = {lat:6.2948,lng:-75.4599};
 
-/* ══ FIREBASE HELPERS ══ */
-const waitFirebase = () => new Promise(r=>{
-  if(window._firebaseReady) return r();
-  window.addEventListener('firebase-ready',r,{once:true});
-});
+/* ── Firebase helpers ── */
+const waitFirebase = ()=>new Promise(r=>{ if(window._firebaseReady)return r(); window.addEventListener('firebase-ready',r,{once:true}); });
+const waitMaps = ()=>new Promise(r=>{ if(window._mapsReady)return r(); window.addEventListener('maps-ready',r,{once:true}); });
+const hasMapsKey = ()=> window.MAPS_KEY && window.MAPS_KEY !== '';
 
-async function fbSet(col,id,data){
-  await waitFirebase();
-  const {doc,setDoc,serverTimestamp} = window._fs;
-  await setDoc(doc(window._db,col,String(id)),{...data,_ts:serverTimestamp()});
-}
-async function fbDel(col,id){
-  await waitFirebase();
-  const {doc,deleteDoc} = window._fs;
-  await deleteDoc(doc(window._db,col,String(id)));
-}
-function fbListen(col,cb,ordField='_ts'){
-  waitFirebase().then(()=>{
-    const {collection,onSnapshot,query,orderBy} = window._fs;
-    const q = query(collection(window._db,col),orderBy(ordField,'asc'));
-    return onSnapshot(q,snap=>{
-      const rows = [];
-      snap.forEach(d=>rows.push({_docId:d.id,...d.data()}));
-      cb(rows);
-    });
-  });
-}
+async function fbSet(col,id,data){ await waitFirebase(); const {doc,setDoc,serverTimestamp}=window._fs; await setDoc(doc(window._db,col,String(id)),{...data,_ts:serverTimestamp()}); }
+async function fbDel(col,id){ await waitFirebase(); const {doc,deleteDoc}=window._fs; await deleteDoc(doc(window._db,col,String(id))); }
+function fbListen(col,cb,ord='_ts'){ waitFirebase().then(()=>{ const {collection,onSnapshot,query,orderBy}=window._fs; return onSnapshot(query(collection(window._db,col),orderBy(ord,'asc')),snap=>{ const r=[]; snap.forEach(d=>r.push({_docId:d.id,...d.data()})); cb(r); }); }); }
 
-/* ══ LOCAL FALLBACK (si Firebase no está configurado) ══ */
-const FIREBASE_CONFIGURED = () => window._firebaseReady === true;
+const ls=(k,d)=>{ try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;} };
+const lsSet=(k,v)=>{ try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
 
-const ls = (k,d)=>{ try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;} };
-const lsSet = (k,v)=>{ try{localStorage.setItem(k,JSON.stringify(v));}catch{} };
-
-/* ══ DATOS INICIALES ══ */
+/* ── Initial data ── */
 const INIT_USERS=[
-  {id:'u1',username:'admin',password:'admin123',name:'Carlos Gómez',role:'admin',phone:'3113581265'},
+  {id:'u1',username:'admin',password:'admin123',name:'Coordinador Frente',role:'admin',phone:'3113581265'},
   {id:'u2',username:'maria',password:'1234',name:'María Pérez',role:'user',phone:'3209876543'},
   {id:'u3',username:'jose',password:'1234',name:'José Ramírez',role:'user',phone:'3155556677'},
 ];
@@ -269,34 +278,43 @@ const INIT_EMERGENCY=[
   {id:'e1',name:'Policía Nacional',number:'112',alt:'3116789012',type:'police',desc:'Emergencias 24h'},
   {id:'e2',name:'Bomberos Guarne',number:'119',alt:'5480100',type:'fire',desc:'Incendios y rescate'},
   {id:'e3',name:'Cruz Roja / Ambulancia',number:'132',alt:'3001234567',type:'medical',desc:'Primeros auxilios'},
-  {id:'e4',name:'Coordinador del frente',number:'3113581265',alt:'',type:'community',desc:'Carlos Gómez'},
+  {id:'e4',name:'Coordinador del frente',number:'3113581265',alt:'',type:'community',desc:'Frente Sango Parte Alta'},
 ];
 const INIT_PROTOCOLS=[
   {id:'p1',level:'green',title:'Persona o vehículo sospechoso',steps:[
     {title:'Observar sin confrontar',desc:'Anote características, placa, hora y lugar. No se acerque.'},
     {title:'Informar al coordinador',desc:'Llame al 3113581265 antes de actuar.'},
-    {title:'Activar grupo de WhatsApp',desc:'Use el botón de alerta 🟢 en la app para enviar el aviso al grupo.'},
+    {title:'Activar alerta 🟢',desc:'Use el módulo de alerta en la app para notificar al grupo.'},
   ]},
   {id:'p2',level:'amber',title:'Robo o hurto',steps:[
     {title:'No perseguir',desc:'Evite confrontar. Su seguridad es lo primero.'},
-    {title:'Llamar a la Policía (112)',desc:'Describa qué ocurrió, dónde, cuántas personas y hacia dónde fueron.'},
-    {title:'Asegurar a la familia',desc:'Reúnalos en un cuarto interior hasta que llegue la autoridad.'},
-    {title:'Activar alerta 🟡',desc:'Use el botón de alerta naranja en la app para notificar al frente.'},
+    {title:'Llamar Policía (112)',desc:'Describa qué ocurrió, dónde, cuántas personas y hacia dónde fueron.'},
+    {title:'Asegurar familia',desc:'Reúnalos en cuarto interior hasta que llegue la autoridad.'},
+    {title:'Activar alerta 🟡',desc:'Use el módulo de alerta naranja en la app.'},
   ]},
   {id:'p3',level:'red',title:'Violencia o secuestro',steps:[
-    {title:'Llame al 112 de inmediato',desc:'No cuelgue. Nombre, vereda Sango Parte Alta, Guarne, qué ocurre.'},
+    {title:'Llame al 112',desc:'No cuelgue. Nombre, vereda Sango Parte Alta Guarne, qué ocurre.'},
     {title:'No negocie solo',desc:'Espere instrucción directa de las autoridades.'},
-    {title:'Activar alerta 🔴',desc:'Use el botón de alerta roja en la app para notificar al frente.'},
-    {title:'Punto de reunión',desc:'La comunidad se reúne en la tienda de Don Aurelio (escuela vieja).'},
+    {title:'Activar alerta 🔴',desc:'Use el módulo de alerta roja en la app.'},
+    {title:'Punto de reunión',desc:'Tienda de Don Aurelio (escuela vieja).'},
   ]},
 ];
 const INIT_HOUSES=[
-  {id:'h1',name:'Finca El Nogal',owner:'Carlos Gómez',phones:['3113581265'],type:'finca',lat:'6.2960',lng:'-75.4595',description:'Portón verde sobre la vía principal.',userId:'u1',registeredAt:'2024-01-10'},
+  {id:'h1',name:'Finca El Nogal',owner:'Coordinador Frente',phones:['3113581265'],type:'finca',lat:'6.2960',lng:'-75.4595',description:'Portón verde sobre la vía principal.',userId:'u1',registeredAt:'2024-01-10'},
   {id:'h2',name:'Finca La Esperanza',owner:'María Pérez',phones:['3209876543'],type:'finca',lat:'6.2945',lng:'-75.4608',description:'Casa blanca con techo rojo.',userId:'u2',registeredAt:'2024-01-12'},
   {id:'h3',name:'Parcela Los Pinos',owner:'José Ramírez',phones:['3155556677'],type:'parcela',lat:'6.2935',lng:'-75.4590',description:'Portón de madera antes del puente.',userId:'u3',registeredAt:'2024-01-15'},
 ];
+const INIT_INFRA=[];
 
-/* ══ ICONS ══ */
+const INFRA_TYPES=[
+  {id:'camara',label:'Cámara',icon:'📹',color:'#533ab7'},
+  {id:'alarma',label:'Alarma',icon:'🔔',color:'#a32d2d'},
+  {id:'luz',label:'Luz seguridad',icon:'💡',color:'#854f0b'},
+  {id:'control',label:'Punto control',icon:'🚧',color:'#236029'},
+  {id:'otro',label:'Otro',icon:'📡',color:'#185fa5'},
+];
+
+/* ── Icons ── */
 const I={
   home:()=><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/></svg>,
   map:()=><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>,
@@ -309,110 +327,187 @@ const I={
   out:()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   plus:()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
   alert:()=><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.5L20.5 19H3.5L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>,
-  log:()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
+  log:()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
   wa:()=><svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.124.554 4.12 1.524 5.857L.058 23.5l5.77-1.513A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 0 1-5.006-1.376l-.36-.213-3.425.898.914-3.335-.234-.373A9.818 9.818 0 1 1 12 21.818z"/></svg>,
+  camera:()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
+  user:()=><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
 };
 
-/* ══ WA MESSAGE BUILDER ══ */
-function buildWAMessage(level,desc,session,myHouse){
+/* ── WA message ── */
+function buildWAMsg(level,desc,session,myHouse){
   const icons={green:'🟢',amber:'🟡',red:'🔴'};
-  const labels={green:'AVISO — Situación sospechosa',amber:'⚠️ ALERTA MODERADA — Robo/Hurto',red:'🚨 EMERGENCIA GRAVE'};
-  const now = new Date();
-  const hora = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
-  const fecha = now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
-  return `${icons[level]} FRENTE DE SEGURIDAD
-Sango Parte Alta · Guarne, Ant.
-━━━━━━━━━━━━━━━━
-📍 Finca: ${myHouse?.name||'Sin registrar'}
-👤 Reporta: ${session.name}
-📞 Contacto: ${session.phone||'—'}
-🕐 ${fecha} ${hora}
-━━━━━━━━━━━━━━━━
-${labels[level]}
-📝 ${desc||'Sin descripción adicional.'}
-━━━━━━━━━━━━━━━━
-📞 Coordinador: ${WA_COORDINATOR}`;
+  const labels={green:'AVISO — Situación sospechosa',amber:'⚠️ ALERTA MODERADA',red:'🚨 EMERGENCIA GRAVE'};
+  const now=new Date();
+  const hora=now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+  const fecha=now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  return `${icons[level]} FRENTE DE SEGURIDAD\nSango Parte Alta · Guarne, Ant.\n━━━━━━━━━━━━━━━━\n📍 Finca: ${myHouse?.name||'Sin registrar'}\n👤 Reporta: ${session.name}\n📞 Contacto: ${session.phone||'—'}\n🕐 ${fecha} ${hora}\n━━━━━━━━━━━━━━━━\n${labels[level]}\n📝 ${desc||'Sin descripción adicional.'}\n━━━━━━━━━━━━━━━━\n📞 Coordinador: ${WA_COORDINATOR}`;
 }
 
-/* ══ APP ROOT ══ */
-function App(){
-  const [session,setSession] = useState(()=>ls('s_session',null));
-  const [view,setView] = useState('dashboard');
-  const [sbOpen,setSbOpen] = useState(false);
-  const [fbOk,setFbOk] = useState(false);
-  const [users,setUsers] = useState(()=>ls('s_users',INIT_USERS));
-  const [houses,setHouses] = useState(()=>ls('s_houses',INIT_HOUSES));
-  const [emergency,setEmergency] = useState(()=>ls('s_emergency',INIT_EMERGENCY));
-  const [protocols,setProtocols] = useState(()=>ls('s_protocols',INIT_PROTOCOLS));
-  const [incidents,setIncidents] = useState(()=>ls('s_incidents',[]));
-  const [modal,setModal] = useState(null);
-  const [searchQ,setSearchQ] = useState('');
-  const [searchR,setSearchR] = useState(null);
+/* ══════════ GOOGLE MAPS COMPONENT ══════════ */
+function GMap({houses,infra,showInfra,onMapClick,clickable}){
+  const ref = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef([]);
 
-  /* Firebase sync */
   useEffect(()=>{
-    waitFirebase().then(()=>{
-      setFbOk(true);
-      fbListen('sango_houses',rows=>{ if(rows.length) setHouses(rows); },'registeredAt');
-      fbListen('sango_users',rows=>{ if(rows.length) setUsers(rows); },'_ts');
-      fbListen('sango_emergency',rows=>{ if(rows.length) setEmergency(rows); },'_ts');
-      fbListen('sango_protocols',rows=>{ if(rows.length) setProtocols(rows); },'_ts');
-      fbListen('sango_incidents',rows=>setIncidents(rows.reverse()),'_ts');
+    if(!hasMapsKey()) return;
+    waitMaps().then(()=>{
+      if(!ref.current) return;
+      const map = new window.google.maps.Map(ref.current,{
+        center:MAP_CENTER, zoom:15,
+        mapTypeId:'hybrid',
+        mapTypeControl:false,
+        streetViewControl:false,
+        fullscreenControl:true,
+        zoomControl:true,
+      });
+      mapRef.current = map;
+      if(clickable){
+        map.addListener('click',e=>{
+          onMapClick && onMapClick({lat:e.latLng.lat().toFixed(6),lng:e.latLng.lng().toFixed(6)});
+        });
+      }
+      renderMarkers(map,houses,infra,showInfra);
     });
   },[]);
 
-  /* localStorage fallback */
+  useEffect(()=>{
+    if(!mapRef.current||!hasMapsKey()) return;
+    markersRef.current.forEach(m=>m.setMap(null));
+    markersRef.current=[];
+    renderMarkers(mapRef.current,houses,infra,showInfra);
+  },[houses,infra,showInfra]);
+
+  function renderMarkers(map,houses,infra,showInfra){
+    const iw = new window.google.maps.InfoWindow();
+    // House markers
+    houses.forEach(h=>{
+      if(!h.lat||!h.lng) return;
+      const marker = new window.google.maps.Marker({
+        position:{lat:parseFloat(h.lat),lng:parseFloat(h.lng)},
+        map,
+        title:h.name,
+        icon:{
+          path:window.google.maps.SymbolPath.CIRCLE,
+          scale:10,
+          fillColor:'#1a4a20',
+          fillOpacity:1,
+          strokeColor:'#fff',
+          strokeWeight:2,
+        }
+      });
+      marker.addListener('click',()=>{
+        iw.setContent(`<div style="font-family:sans-serif;padding:4px;min-width:160px"><strong style="font-size:13px">${h.name}</strong><p style="font-size:11px;color:#555;margin:3px 0">${h.owner} · ${h.type}</p><p style="font-size:11px;color:#555;margin:2px 0">${h.description||''}</p>${h.phones.map(p=>`<a href="tel:${p}" style="font-size:12px;color:#185fa5;display:block;margin-top:4px">📞 ${p}</a>`).join('')}</div>`);
+        iw.open(map,marker);
+      });
+      markersRef.current.push(marker);
+    });
+    // Infra markers
+    if(showInfra) infra.forEach(item=>{
+      if(!item.lat||!item.lng) return;
+      const t = INFRA_TYPES.find(x=>x.id===item.type)||INFRA_TYPES[4];
+      const marker = new window.google.maps.Marker({
+        position:{lat:parseFloat(item.lat),lng:parseFloat(item.lng)},
+        map,
+        title:item.name,
+        icon:{
+          path:window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+          scale:8,
+          fillColor:t.color,
+          fillOpacity:1,
+          strokeColor:'#fff',
+          strokeWeight:1.5,
+        }
+      });
+      marker.addListener('click',()=>{
+        iw.setContent(`<div style="font-family:sans-serif;padding:4px;min-width:140px"><strong style="font-size:13px">${t.icon} ${item.name}</strong><p style="font-size:11px;color:#555;margin:3px 0">${t.label} · ${item.status==='activo'?'✅ Activo':'⚠️ Inactivo'}</p><p style="font-size:11px;color:#555;margin:2px 0">${item.responsible||''}</p>${item.phone?`<a href="tel:${item.phone}" style="font-size:12px;color:#185fa5;display:block;margin-top:4px">📞 ${item.phone}</a>`:''}</div>`);
+        iw.open(map,marker);
+      });
+      markersRef.current.push(marker);
+    });
+  }
+
+  if(!hasMapsKey()) return(
+    <div className="map-fallback">
+      <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d4454.808660218492!2d-75.45993115020094!3d6.294787254184727!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1ses!2sco!4v1778508260570!5m2!1ses!2sco" allowFullScreen="" loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="Mapa Sango Parte Alta"/>
+    </div>
+  );
+  return <div ref={ref} className="map-container"/>;
+}
+
+/* ══════════ APP ROOT ══════════ */
+function App(){
+  const [session,setSession]=useState(()=>ls('s_session',null));
+  const [view,setView]=useState('dashboard');
+  const [sbOpen,setSbOpen]=useState(false);
+  const [fbOk,setFbOk]=useState(false);
+  const [users,setUsers]=useState(()=>ls('s_users',INIT_USERS));
+  const [houses,setHouses]=useState(()=>ls('s_houses',INIT_HOUSES));
+  const [emergency,setEmergency]=useState(()=>ls('s_emergency',INIT_EMERGENCY));
+  const [protocols,setProtocols]=useState(()=>ls('s_protocols',INIT_PROTOCOLS));
+  const [incidents,setIncidents]=useState(()=>ls('s_incidents',[]));
+  const [infra,setInfra]=useState(()=>ls('s_infra',INIT_INFRA));
+  const [modal,setModal]=useState(null);
+  const [searchQ,setSearchQ]=useState('');
+  const [searchR,setSearchR]=useState(null);
+  const [pendingLatLng,setPendingLatLng]=useState(null);
+
+  useEffect(()=>{
+    waitFirebase().then(()=>{
+      setFbOk(true);
+      fbListen('sango_houses',r=>{ if(r.length) setHouses(r); },'registeredAt');
+      fbListen('sango_users',r=>{ if(r.length) setUsers(r); },'_ts');
+      fbListen('sango_emergency',r=>{ if(r.length) setEmergency(r); },'_ts');
+      fbListen('sango_protocols',r=>{ if(r.length) setProtocols(r); },'_ts');
+      fbListen('sango_incidents',r=>setIncidents(r.reverse()),'_ts');
+      fbListen('sango_infra',r=>setInfra(r),'_ts');
+    });
+  },[]);
+
   useEffect(()=>lsSet('s_houses',houses),[houses]);
   useEffect(()=>lsSet('s_users',users),[users]);
   useEffect(()=>lsSet('s_emergency',emergency),[emergency]);
   useEffect(()=>lsSet('s_protocols',protocols),[protocols]);
   useEffect(()=>lsSet('s_incidents',incidents),[incidents]);
+  useEffect(()=>lsSet('s_infra',infra),[infra]);
   useEffect(()=>{ if(session) lsSet('s_session',session); else localStorage.removeItem('s_session'); },[session]);
 
-  const nav = v=>{ setView(v); setSbOpen(false); };
+  const nav=v=>{ setView(v); setSbOpen(false); };
+  const initials=n=>n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 
-  const persistHouse = async (data)=>{
-    setHouses(p=>{const ex=p.find(h=>h.userId===session.id); return ex?p.map(h=>h.userId===session.id?{...h,...data}:h):[...p,data];});
-    if(fbOk) await fbSet('sango_houses',data.id,data);
-  };
-  const persistUser = async (u)=>{
-    setUsers(p=>p.map(x=>x.id===u.id?u:x));
-    if(fbOk) await fbSet('sango_users',u.id,u);
-  };
-  const persistEmergency = async list=>{ setEmergency(list); if(fbOk) for(const e of list) await fbSet('sango_emergency',e.id,e); };
-  const persistProtocol = async list=>{ setProtocols(list); if(fbOk) for(const p of list) await fbSet('sango_protocols',p.id,p); };
-  const deleteHouse = async id=>{ setHouses(p=>p.filter(h=>h.id!==id)); if(fbOk) await fbDel('sango_houses',id); };
-  const deleteUser = async id=>{ setUsers(p=>p.filter(u=>u.id!==id)); if(fbOk) await fbDel('sango_users',id); };
-
-  const addIncident = async (inc)=>{
-    const full={...inc,id:'i'+Date.now(),createdAt:new Date().toLocaleString('es-CO')};
-    setIncidents(p=>[full,...p]);
-    if(fbOk) await fbSet('sango_incidents',full.id,full);
-  };
+  const persistHouse=async d=>{ setHouses(p=>{const ex=p.find(h=>h.userId===session.id); return ex?p.map(h=>h.userId===session.id?{...h,...d}:h):[...p,d];}); if(fbOk) await fbSet('sango_houses',d.id,d); };
+  const persistUser=async u=>{ setUsers(p=>p.map(x=>x.id===u.id?u:x)); if(session.id===u.id) setSession(u); if(fbOk) await fbSet('sango_users',u.id,u); };
+  const persistEmergency=async list=>{ setEmergency(list); if(fbOk) for(const e of list) await fbSet('sango_emergency',e.id,e); };
+  const persistProtocol=async list=>{ setProtocols(list); if(fbOk) for(const p of list) await fbSet('sango_protocols',p.id,p); };
+  const deleteHouse=async id=>{ setHouses(p=>p.filter(h=>h.id!==id)); if(fbOk) await fbDel('sango_houses',id); };
+  const deleteUser=async id=>{ setUsers(p=>p.filter(u=>u.id!==id)); if(fbOk) await fbDel('sango_users',id); };
+  const persistInfra=async item=>{ setInfra(p=>{const ex=p.find(x=>x.id===item.id); return ex?p.map(x=>x.id===item.id?item:x):[...p,item];}); if(fbOk) await fbSet('sango_infra',item.id,item); };
+  const deleteInfra=async id=>{ setInfra(p=>p.filter(x=>x.id!==id)); if(fbOk) await fbDel('sango_infra',id); };
+  const addIncident=async inc=>{ const full={...inc,id:'i'+Date.now(),createdAt:new Date().toLocaleString('es-CO')}; setIncidents(p=>[full,...p]); if(fbOk) await fbSet('sango_incidents',full.id,full); };
 
   if(!session) return(
     <LoginPage
-      users={users} setUsers={setUsers} fbOk={fbOk}
-      onLogin={(u,p)=>{const f=users.find(x=>x.username===u&&x.password===p);if(f){setSession(f);return true;}return false;}}
-      onNewUser={async d=>{const nu={id:'u'+Date.now(),...d,role:'user'};setUsers(p=>[...p,nu]);if(fbOk)await fbSet('sango_users',nu.id,nu);setSession(nu);}}
+      users={users}
+      onLogin={(u,p)=>{ const f=users.find(x=>x.username===u&&x.password===p); if(f){setSession(f);return true;} return false; }}
+      onNewUser={async d=>{ const nu={id:'u'+Date.now(),...d,role:'user'}; setUsers(p=>[...p,nu]); if(fbOk) await fbSet('sango_users',nu.id,nu); setSession(nu); }}
     />
   );
 
-  const myHouse = houses.find(h=>h.userId===session.id);
-  const VIEW_TITLES={dashboard:'Inicio',map:'Mapa del frente',emergency:'Emergencias',protocol:'Protocolo de seguridad',search:'Buscar finca / persona',alert:'Enviar alerta',incidents:'Historial de alertas',admin_reg:'Registro de fincas',admin_em:'Editar emergencias',admin_proto:'Editar protocolos',admin_users:'Gestionar usuarios'};
-  const initials=n=>n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-
+  const myHouse=houses.find(h=>h.userId===session.id);
+  const TITLES={dashboard:'Inicio',map:'Mapa del frente',emergency:'Emergencias',protocol:'Protocolo de seguridad',search:'Buscar finca / persona',alert:'Enviar alerta',incidents:'Historial de alertas',infra:'Infraestructura de seguridad',profile:'Mi perfil',admin_reg:'Registro de fincas',admin_em:'Editar emergencias',admin_proto:'Editar protocolos',admin_users:'Gestionar usuarios'};
   const NAV=[
     {id:'dashboard',label:'Inicio',Icon:I.home},
     {id:'map',label:'Mapa del frente',Icon:I.map},
     {id:'emergency',label:'Emergencias',Icon:I.phone},
-    {id:'protocol',label:'Protocolo de seguridad',Icon:I.shield},
+    {id:'protocol',label:'Protocolos',Icon:I.shield},
     {id:'search',label:'Buscar finca',Icon:I.search},
+    {id:'infra',label:'Infraestructura 📹',Icon:I.camera},
     {id:'alert',label:'Enviar alerta 🚨',Icon:I.alert},
     {id:'incidents',label:'Historial alertas',Icon:I.log},
+    {id:'profile',label:'Mi perfil',Icon:I.user},
   ];
   const ANAV=[
-    {id:'admin_reg',label:'Registro de fincas',Icon:I.users},
+    {id:'admin_reg',label:'Registro fincas',Icon:I.users},
     {id:'admin_em',label:'Editar emergencias',Icon:I.edit},
     {id:'admin_proto',label:'Editar protocolos',Icon:I.edit},
     {id:'admin_users',label:'Gestionar usuarios',Icon:I.users},
@@ -439,24 +534,23 @@ function App(){
         <div className="topbar">
           <div style={{display:'flex',alignItems:'center',gap:9}}>
             <button className="hamburger" onClick={()=>setSbOpen(o=>!o)}><I.menu/></button>
-            <h2>{VIEW_TITLES[view]||view}</h2>
+            <h2>{TITLES[view]||view}</h2>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <span title={fbOk?'Firebase conectado':'Sin Firebase — datos locales'}>
-              <span className={`sync-dot ${fbOk?'ok':'off'}`}/>
-              <span style={{fontSize:'.68rem',color:'var(--txm)'}}>{fbOk?'Sincronizado':'Local'}</span>
-            </span>
+            <span title={fbOk?'Firebase sincronizado':'Modo local'}><span className={`sync-dot ${fbOk?'ok':'off'}`}/><span style={{fontSize:'.68rem',color:'var(--txm)'}}>{fbOk?'Sync':'Local'}</span></span>
             {session.role==='admin'&&<span className="tb-badge">Admin</span>}
           </div>
         </div>
         <div className="page">
-          {view==='dashboard'&&<Dashboard houses={houses} session={session} myHouse={myHouse} nav={nav} emergency={emergency} incidents={incidents}/>}
-          {view==='map'&&<MapView houses={houses} session={session} myHouse={myHouse} onRegister={()=>setModal('house')}/>}
+          {view==='dashboard'&&<Dashboard houses={houses} session={session} myHouse={myHouse} nav={nav} emergency={emergency} incidents={incidents} infra={infra}/>}
+          {view==='map'&&<MapView houses={houses} infra={infra} session={session} myHouse={myHouse} onRegisterHouse={()=>setModal('house')} onRegisterInfra={()=>setModal('infra')} onMapClick={ll=>{setPendingLatLng(ll);setModal('house');}}/>}
           {view==='emergency'&&<EmergencyView numbers={emergency}/>}
           {view==='protocol'&&<ProtocolView protocols={protocols}/>}
-          {view==='search'&&<SearchView searchQ={searchQ} setSearchQ={setSearchQ} searchR={searchR} setSearchR={setSearchR} houses={houses} nav={nav}/>}
+          {view==='search'&&<SearchView searchQ={searchQ} setSearchQ={setSearchQ} searchR={searchR} setSearchR={setSearchR} houses={houses} infra={infra} nav={nav}/>}
+          {view==='infra'&&<InfraView infra={infra} session={session} onAdd={()=>setModal('infra')} onDelete={deleteInfra}/>}
           {view==='alert'&&<AlertView session={session} myHouse={myHouse} addIncident={addIncident}/>}
           {view==='incidents'&&<IncidentsView incidents={incidents}/>}
+          {view==='profile'&&<ProfileView session={session} persistUser={persistUser}/>}
           {view==='admin_reg'&&session.role==='admin'&&<AdminReg houses={houses} users={users} deleteHouse={deleteHouse}/>}
           {view==='admin_em'&&session.role==='admin'&&<AdminEmergency emergency={emergency} persist={persistEmergency}/>}
           {view==='admin_proto'&&session.role==='admin'&&<AdminProtocol protocols={protocols} persist={persistProtocol}/>}
@@ -464,18 +558,19 @@ function App(){
         </div>
       </div>
 
-      {modal==='house'&&<HouseModal onClose={()=>setModal(null)} onSave={async d=>{await persistHouse(d);setModal(null);}} existing={myHouse} session={session}/>}
+      {modal==='house'&&<HouseModal onClose={()=>{setModal(null);setPendingLatLng(null);}} onSave={async d=>{await persistHouse(d);setModal(null);setPendingLatLng(null);}} existing={myHouse} session={session} preLatLng={pendingLatLng}/>}
+      {modal==='infra'&&<InfraModal onClose={()=>setModal(null)} onSave={async d=>{await persistInfra(d);setModal(null);}} session={session}/>}
     </div>
   );
 }
 
 /* ══ LOGIN ══ */
-function LoginPage({users,setUsers,fbOk,onLogin,onNewUser}){
+function LoginPage({users,onLogin,onNewUser}){
   const [tab,setTab]=useState('login');
   const [u,setU]=useState('');const [p,setP]=useState('');const [err,setErr]=useState('');
   const [reg,setReg]=useState({username:'',password:'',name:'',phone:''});
   const doLogin=e=>{e.preventDefault();if(!onLogin(u,p))setErr('Usuario o contraseña incorrectos.');};
-  const doReg=e=>{e.preventDefault();if(!reg.username||!reg.password||!reg.name){setErr('Complete los campos obligatorios');return;}onNewUser(reg);};
+  const doReg=e=>{e.preventDefault();if(!reg.username||!reg.password||!reg.name){setErr('Complete los campos obligatorios.');return;}onNewUser(reg);};
   return(
     <div className="login-page">
       <div className="login-hero">
@@ -513,18 +608,19 @@ function LoginPage({users,setUsers,fbOk,onLogin,onNewUser}){
 }
 
 /* ══ DASHBOARD ══ */
-function Dashboard({houses,session,myHouse,nav,emergency,incidents}){
+function Dashboard({houses,session,myHouse,nav,emergency,incidents,infra}){
+  const today=new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const todayAlerts=incidents.filter(i=>i.createdAt?.startsWith(today)).length;
   return(<>
-    {!myHouse&&<div className="banner warn"><span style={{fontSize:'1.3rem'}}>📍</span><div><p>Aún no ha registrado su finca</p><span>Vaya al Mapa para ubicar su propiedad en el frente.</span><button className="btn btn-p" style={{marginTop:'.5rem'}} onClick={()=>nav('map')}>Registrar ahora</button></div></div>}
+    {!myHouse&&<div className="banner warn"><span className="ico">📍</span><div className="txt"><p>Aún no ha registrado su finca</p><span>Vaya al Mapa para ubicar su propiedad.</span><button className="btn btn-p" style={{marginTop:'.5rem'}} onClick={()=>nav('map')}>Registrar ahora</button></div></div>}
     <div className="stats">
       <div className="stat"><div className="lbl">Fincas</div><div className="val">{houses.length}</div><div className="sub">Registradas</div></div>
-      <div className="stat"><div className="lbl">Alertas hoy</div><div className="val">{incidents.filter(i=>i.createdAt?.startsWith(new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'}))).length}</div><div className="sub">En el frente</div></div>
-      <div className="stat"><div className="lbl">Emergencias</div><div className="val">{emergency.length}</div><div className="sub">Números activos</div></div>
-      <div className="stat"><div className="lbl">Mi finca</div><div className="val" style={{fontSize:'.95rem',paddingTop:4}}>{myHouse?myHouse.name:'—'}</div><div className="sub">{myHouse?myHouse.phones[0]:'Sin registrar'}</div></div>
+      <div className="stat"><div className="lbl">Alertas hoy</div><div className="val">{todayAlerts}</div><div className="sub">En el frente</div></div>
+      <div className="stat"><div className="lbl">Cámaras / alarmas</div><div className="val">{infra.length}</div><div className="sub">Infraestructura</div></div>
+      <div className="stat"><div className="lbl">Mi finca</div><div className="val" style={{fontSize:'.9rem',paddingTop:4}}>{myHouse?myHouse.name:'—'}</div><div className="sub">{myHouse?myHouse.phones[0]:'Sin registrar'}</div></div>
     </div>
-    <div className="banner warn" style={{cursor:'pointer'}} onClick={()=>nav('alert')}>
-      <span style={{fontSize:'1.5rem'}}>🚨</span>
-      <div><p>¿Hay un evento de seguridad ahora?</p><span>Toque aquí para enviar una alerta al grupo del frente vía WhatsApp.</span></div>
+    <div className="banner err" style={{cursor:'pointer'}} onClick={()=>nav('alert')}>
+      <span className="ico">🚨</span><div className="txt"><p>¿Evento de seguridad ahora?</p><span>Toque aquí para enviar alerta al frente vía WhatsApp.</span></div>
     </div>
     <p style={{fontSize:'.72rem',color:'var(--txm)',textTransform:'uppercase',letterSpacing:'.06em',fontWeight:500,marginBottom:'.6rem'}}>Emergencias rápidas</p>
     {emergency.slice(0,3).map(n=>(
@@ -537,30 +633,56 @@ function Dashboard({houses,session,myHouse,nav,emergency,incidents}){
       <div className="divider"/>
       <p style={{fontSize:'.72rem',color:'var(--txm)',textTransform:'uppercase',letterSpacing:'.06em',fontWeight:500,marginBottom:'.6rem'}}>Alertas recientes</p>
       {incidents.slice(0,3).map(i=>(
-        <div key={i.id} className="inc-row">
-          <div className={`inc-icon ${i.level}`}>{i.level==='green'?'🟢':i.level==='amber'?'🟡':'🔴'}</div>
-          <div className="inc-info"><h4>{i.desc?.slice(0,60)||'Alerta enviada'}</h4><p>{i.reporter} · {i.finca||'Sin finca'}</p><p className="inc-meta">{i.createdAt}</p></div>
+        <div key={i.id} className="inc-row"><div className={`inc-icon ${i.level}`}>{i.level==='green'?'🟢':i.level==='amber'?'🟡':'🔴'}</div>
+          <div className="inc-info"><h4>{i.desc?.slice(0,60)||'Alerta enviada'}</h4><p>{i.reporter} · {i.finca||'—'}</p><p className="inc-meta">{i.createdAt}</p></div>
         </div>
       ))}
     </>}
   </>);
 }
 
-/* ══ MAP ══ */
-function MapView({houses,session,myHouse,onRegister}){
+/* ══ MAP VIEW ══ */
+function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,onMapClick}){
+  const [tab,setTab]=useState('fincas');
+  const [showInfra,setShowInfra]=useState(true);
+  const [clickMode,setClickMode]=useState(null); // 'house' | 'infra' | null
+
+  const handleMapClick=ll=>{
+    if(clickMode==='house'){ onMapClick(ll); setClickMode(null); }
+  };
+
   return(<>
-    <div style={{marginBottom:'.75rem',display:'flex',gap:'.5rem',flexWrap:'wrap',alignItems:'center',justifyContent:'space-between'}}>
-      <p style={{fontSize:'.83rem',color:'var(--txm)'}}>Vereda Sango Parte Alta — Guarne, Antioquia</p>
-      <button className="btn btn-p" onClick={onRegister}>{myHouse?'✏️ Editar mi finca':'📍 Registrar mi finca'}</button>
+    <div style={{marginBottom:'.75rem',display:'flex',gap:'.5rem',flexWrap:'wrap',justifyContent:'space-between',alignItems:'center'}}>
+      <p style={{fontSize:'.83rem',color:'var(--txm)'}}>Sango Parte Alta — Guarne, Antioquia</p>
+      <div style={{display:'flex',gap:6}}>
+        <button className="btn btn-s btn-sm" onClick={()=>{ setClickMode('house'); }} style={clickMode==='house'?{background:'var(--sky0)',borderColor:'var(--sky)',color:'var(--sky)'}:{}}>
+          {clickMode==='house'?'🖱️ Toque el mapa':'📍 Ubicar finca'}
+        </button>
+        <button className="btn btn-s btn-sm" onClick={onRegisterInfra}>📹 Agregar infraestructura</button>
+      </div>
     </div>
-    <div className="map-wrap">
-      <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d4454.808660218492!2d-75.45993115020094!3d6.294787254184727!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e1!3m2!1ses!2sco!4v1778508260570!5m2!1ses!2sco" allowFullScreen="" loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="Mapa Sango Parte Alta, Guarne"/>
+
+    {!hasMapsKey()&&(
+      <div className="banner warn" style={{marginBottom:'.75rem'}}>
+        <span className="ico">🗺️</span>
+        <div className="txt"><p>Mapa en modo básico</p><span>Para ver marcadores sobre el mapa real, agregue su clave de Google Maps API. Por ahora se muestra la vista satelital sin marcadores interactivos.</span></div>
+      </div>
+    )}
+
+    <div style={{marginBottom:'.6rem',display:'flex',alignItems:'center',gap:10}}>
+      <label style={{fontSize:'.78rem',color:'var(--txs)',display:'flex',alignItems:'center',gap:5,cursor:'pointer'}}>
+        <input type="checkbox" checked={showInfra} onChange={e=>setShowInfra(e.target.checked)}/>
+        Mostrar cámaras / alarmas en el mapa
+      </label>
     </div>
-    <div className="banner info" style={{marginBottom:'.9rem'}}>
-      <span>💡</span><div><p>Cómo obtener sus coordenadas GPS</p><span>Abra Google Maps en su celular → mantenga presionado sobre su finca → copie los dos números que aparecen (ej: 6.2948, -75.4599) → péguelos al registrar.</span></div>
+
+    <GMap houses={houses} infra={infra} showInfra={showInfra} onMapClick={handleMapClick} clickable={clickMode==='house'}/>
+
+    <div className="map-tabs">
+      {['fincas','infra'].map(t=><button key={t} className={`map-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>{t==='fincas'?`🏡 Fincas (${houses.length})`:`📹 Infraestructura (${infra.length})`}</button>)}
     </div>
-    <p style={{fontSize:'.72rem',color:'var(--txm)',textTransform:'uppercase',letterSpacing:'.06em',fontWeight:500,marginBottom:'.6rem'}}>Propiedades registradas ({houses.length})</p>
-    {houses.map(h=>(
+
+    {tab==='fincas'&&houses.map(h=>(
       <div key={h.id} style={{background:'var(--surf)',border:`1px solid ${h.userId===session.id?'var(--g3)':'var(--bdr)'}`,borderRadius:'var(--r12)',padding:'.8rem',marginBottom:'.48rem'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:7,marginBottom:4,flexWrap:'wrap'}}>
           <p style={{fontWeight:500,fontSize:'.85rem'}}>{h.name}</p>
@@ -569,9 +691,150 @@ function MapView({houses,session,myHouse,onRegister}){
         <p style={{fontSize:'.78rem',color:'var(--txm)',marginBottom:5}}>{h.owner}</p>
         {h.description&&<p style={{fontSize:'.76rem',color:'var(--txm)',marginBottom:5,fontStyle:'italic'}}>📍 {h.description}</p>}
         {h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip">📞 {p}</a>)}
-        {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver en mapa</a>}
+        {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver</a>}
       </div>
     ))}
+
+    {tab==='infra'&&(infra.length===0
+      ? <div className="empty"><div className="big">📹</div><p>No hay infraestructura registrada aún</p><button className="btn btn-p" style={{marginTop:'.75rem'}} onClick={onRegisterInfra}>+ Agregar cámara o alarma</button></div>
+      : infra.map(item=>{
+        const t=INFRA_TYPES.find(x=>x.id===item.type)||INFRA_TYPES[4];
+        return(
+          <div key={item.id} className="infra-card">
+            <div className="infra-ico" style={{background:t.color+'22'}}><span>{t.icon}</span></div>
+            <div className="inc-info" style={{flex:1}}>
+              <h4>{item.name}</h4>
+              <p>{t.label} · <span className={`badge ${item.status==='activo'?'green':'amber'}`}>{item.status==='activo'?'✅ Activo':'⚠️ Inactivo'}</span></p>
+              {item.responsible&&<p>Responsable: {item.responsible}</p>}
+              {item.description&&<p>{item.description}</p>}
+              {item.phone&&<a href={`tel:${item.phone}`} className="pchip" style={{marginTop:5,display:'inline-block'}}>📞 {item.phone}</a>}
+              {item.lat&&item.lng&&<a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver</a>}
+            </div>
+          </div>
+        );
+      })
+    )}
+  </>);
+}
+
+/* ══ INFRA VIEW ══ */
+function InfraView({infra,session,onAdd,onDelete}){
+  return(<>
+    <p style={{fontSize:'.83rem',color:'var(--txm)',marginBottom:'.9rem'}}>Registro de cámaras, alarmas y otros dispositivos de seguridad en la vereda.</p>
+    <button className="btn btn-p" style={{marginBottom:'1rem'}} onClick={onAdd}><I.plus/>Agregar dispositivo</button>
+    {infra.length===0&&<div className="empty"><div className="big">📹</div><p>No hay infraestructura registrada</p></div>}
+    {infra.map(item=>{
+      const t=INFRA_TYPES.find(x=>x.id===item.type)||INFRA_TYPES[4];
+      return(
+        <div key={item.id} className="infra-card">
+          <div className="infra-ico" style={{background:t.color+'22',fontSize:'1.4rem'}}>{t.icon}</div>
+          <div style={{flex:1}}>
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:7,flexWrap:'wrap',marginBottom:4}}>
+              <p style={{fontWeight:500,fontSize:'.88rem'}}>{item.name}</p>
+              <div style={{display:'flex',gap:5}}>
+                <span className={`badge ${item.status==='activo'?'green':'amber'}`}>{item.status==='activo'?'✅ Activo':'⚠️ Inactivo'}</span>
+                <span className="badge pur">{t.label}</span>
+              </div>
+            </div>
+            {item.responsible&&<p style={{fontSize:'.78rem',color:'var(--txm)'}}>Responsable: {item.responsible}</p>}
+            {item.description&&<p style={{fontSize:'.78rem',color:'var(--txm)',marginTop:3}}>{item.description}</p>}
+            <div style={{marginTop:6,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+              {item.phone&&<a href={`tel:${item.phone}`} className="pchip">📞 {item.phone}</a>}
+              {item.lat&&item.lng&&<a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver en mapa</a>}
+              <button className="btn btn-d btn-sm" style={{marginLeft:'auto'}} onClick={()=>{if(confirm('¿Eliminar este dispositivo?'))onDelete(item.id);}}>🗑️</button>
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </>);
+}
+
+/* ══ INFRA MODAL ══ */
+function InfraModal({onClose,onSave,session}){
+  const [form,setForm]=useState({name:'',type:'camara',status:'activo',responsible:session.name,phone:session.phone||'',lat:'',lng:'',description:''});
+  const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
+  const save=()=>{ if(!form.name)return; onSave({...form,id:'infra'+Date.now(),addedBy:session.id,registeredAt:new Date().toISOString().slice(0,10)}); };
+  return(
+    <div className="modal-ov"><div className="modal">
+      <div className="modal-hdr"><h3>Registrar infraestructura de seguridad</h3><button className="btn-x" onClick={onClose}>×</button></div>
+      <div className="modal-body">
+        <div className="field"><label>Nombre / descripción *</label><input value={form.name} onChange={set('name')} placeholder="Cámara entrada principal"/></div>
+        <div className="form-row">
+          <div className="field"><label>Tipo</label>
+            <select value={form.type} onChange={set('type')}>
+              {INFRA_TYPES.map(t=><option key={t.id} value={t.id}>{t.icon} {t.label}</option>)}
+            </select>
+          </div>
+          <div className="field"><label>Estado</label>
+            <select value={form.status} onChange={set('status')}>
+              <option value="activo">✅ Activo</option>
+              <option value="inactivo">⚠️ Inactivo / en reparación</option>
+            </select>
+          </div>
+        </div>
+        <div className="form-row">
+          <div className="field"><label>Responsable</label><input value={form.responsible} onChange={set('responsible')} placeholder="Juan Pérez"/></div>
+          <div className="field"><label>Teléfono contacto</label><input value={form.phone} onChange={set('phone')} placeholder="310..." inputMode="tel"/></div>
+        </div>
+        <div style={{background:'var(--g0)',border:'1px solid var(--g2)',borderRadius:'var(--r8)',padding:'.7rem',marginBottom:'.9rem'}}>
+          <p style={{fontSize:'.78rem',fontWeight:500,color:'var(--g7)',marginBottom:'.4rem'}}>📍 Coordenadas GPS</p>
+          <p style={{fontSize:'.72rem',color:'var(--txm)',marginBottom:'.5rem',lineHeight:1.5}}>Google Maps → mantenga presionado sobre la ubicación del dispositivo → copie los números.</p>
+          <div className="form-row">
+            <div className="field" style={{marginBottom:0}}><label>Latitud</label><input value={form.lat} onChange={set('lat')} placeholder="6.2948" inputMode="decimal"/></div>
+            <div className="field" style={{marginBottom:0}}><label>Longitud</label><input value={form.lng} onChange={set('lng')} placeholder="-75.4599" inputMode="decimal"/></div>
+          </div>
+          {form.lat&&form.lng&&<a href={`https://www.google.com/maps?q=${form.lat},${form.lng}`} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',marginTop:'.45rem',fontSize:'.75rem',color:'var(--sky)',textDecoration:'underline'}}>🗺️ Verificar en Google Maps</a>}
+        </div>
+        <div className="field"><label>Notas adicionales</label><textarea value={form.description} onChange={set('description')} placeholder="Cubre el portón, grabación 24h, cámara domo..." rows={2}/></div>
+      </div>
+      <div className="modal-ftr"><button className="btn btn-s" onClick={onClose}>Cancelar</button><button className="btn btn-p" onClick={save}>💾 Guardar</button></div>
+    </div></div>
+  );
+}
+
+/* ══ PROFILE VIEW ══ */
+function ProfileView({session,persistUser}){
+  const [form,setForm]=useState({name:session.name,phone:session.phone||'',username:session.username,password:'',newPassword:''});
+  const [saved,setSaved]=useState(false);
+  const [err,setErr]=useState('');
+  const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
+  const initials=n=>n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const save=async()=>{
+    if(!form.name){setErr('El nombre es obligatorio.');return;}
+    if(form.newPassword&&form.newPassword.length<4){setErr('La nueva contraseña debe tener al menos 4 caracteres.');return;}
+    const updated={...session,name:form.name,phone:form.phone,username:form.username};
+    if(form.newPassword) updated.password=form.newPassword;
+    await persistUser(updated);
+    setSaved(true); setErr('');
+    setTimeout(()=>setSaved(false),3000);
+  };
+  return(<>
+    <div className="profile-card">
+      <div className="profile-av">{initials(form.name||session.name)}</div>
+      <div>
+        <p style={{fontWeight:500,fontSize:'1rem'}}>{form.name||session.name}</p>
+        <p style={{fontSize:'.82rem',color:'var(--txm)'}}>{session.role==='admin'?'⭐ Coordinador':'Habitante'}</p>
+        <p style={{fontSize:'.78rem',color:'var(--txm)',marginTop:3}}>{form.username}</p>
+      </div>
+    </div>
+    {err&&<div className="banner err" style={{marginBottom:'.9rem'}}><span className="ico">⚠️</span><div className="txt"><p>{err}</p></div></div>}
+    {saved&&<div className="banner info" style={{marginBottom:'.9rem'}}><span className="ico">✅</span><div className="txt"><p>Perfil actualizado correctamente</p></div></div>}
+    <div className="card"><div className="card-hdr"><h3>Información personal</h3></div><div className="card-body">
+      <div className="field"><label>Nombre completo *</label><input value={form.name} onChange={set('name')} placeholder="Juan Pérez"/></div>
+      <div className="form-row">
+        <div className="field"><label>Usuario</label><input value={form.username} onChange={set('username')} placeholder="juanperez"/></div>
+        <div className="field"><label>Teléfono WhatsApp</label><input value={form.phone} onChange={set('phone')} placeholder="310..." inputMode="tel"/></div>
+      </div>
+    </div></div>
+    <div className="card"><div className="card-hdr"><h3>Cambiar contraseña</h3></div><div className="card-body">
+      <div className="form-row">
+        <div className="field"><label>Contraseña actual</label><input type="password" value={form.password} onChange={set('password')} placeholder="••••••••"/></div>
+        <div className="field"><label>Nueva contraseña</label><input type="password" value={form.newPassword} onChange={set('newPassword')} placeholder="••••••••"/></div>
+      </div>
+      <p style={{fontSize:'.75rem',color:'var(--txm)'}}>Deje en blanco si no desea cambiar la contraseña.</p>
+    </div></div>
+    <button className="btn btn-p btn-full" onClick={save}>💾 Guardar cambios</button>
   </>);
 }
 
@@ -581,19 +844,14 @@ function EmergencyView({numbers}){
     <div className="em-grid">
       {numbers.map(n=>(
         <a key={n.id} href={`tel:${n.number}`} className={`em-card ${n.type}`}>
-          <div className="em-ico">{n.type==='police'?<I.shield/>:n.type==='fire'?<svg viewBox="0 0 24 24" fill="white"><path d="M12 2C8 2 4 6 4 10c0 3 2 5.5 5 7.5-.5-1.5-1-3 0-4.5C10.5 15 12 17 11 19c2.5-1 5-4 5-7a5 5 0 0 0-4-5z"/></svg>:n.type==='community'?<I.users/>:<I.phone/>}</div>
+          <div className="em-ico">{n.type==='police'?<I.shield/>:n.type==='community'?<I.users/>:<I.phone/>}</div>
           <div className="em-info"><h4>{n.name}</h4><div className="em-num">{n.number}</div><small>{n.desc}{n.alt&&` · Alt: ${n.alt}`}</small></div>
         </a>
       ))}
     </div>
     <div className="card"><div className="card-hdr"><h3>⚠️ Al llamar recuerde</h3></div><div className="card-body">
-      {[['📍','Dé su ubicación','Vereda Sango Parte Alta, Guarne, Antioquia. Indique una referencia visible.'],
-        ['🗣️','Sea claro','Qué pasó, cuántas personas, si hay heridos, hacia dónde se dirigieron.'],
-        ['📱','No cuelgue','Hasta que el operador le indique que puede hacerlo.']].map(([ic,t,d],i)=>(
-        <div key={i} style={{display:'flex',gap:9,marginBottom:10}}>
-          <span style={{fontSize:'1.2rem',flexShrink:0}}>{ic}</span>
-          <div><p style={{fontWeight:500,fontSize:'.85rem'}}>{t}</p><p style={{fontSize:'.78rem',color:'var(--txm)',lineHeight:1.5}}>{d}</p></div>
-        </div>
+      {[['📍','Dé su ubicación','Vereda Sango Parte Alta, Guarne, Antioquia.'],['🗣️','Sea claro','Qué pasó, cuántas personas, si hay heridos.'],['📱','No cuelgue','Hasta que el operador le indique.']].map(([ic,t,d],i)=>(
+        <div key={i} style={{display:'flex',gap:9,marginBottom:10}}><span style={{fontSize:'1.2rem',flexShrink:0}}>{ic}</span><div><p style={{fontWeight:500,fontSize:'.85rem'}}>{t}</p><p style={{fontSize:'.78rem',color:'var(--txm)',lineHeight:1.5}}>{d}</p></div></div>
       ))}
     </div></div>
   </>);
@@ -602,45 +860,59 @@ function EmergencyView({numbers}){
 /* ══ PROTOCOL VIEW ══ */
 function ProtocolView({protocols}){
   return(<>
-    <p style={{color:'var(--txm)',fontSize:'.83rem',marginBottom:'.9rem',lineHeight:1.6}}>Guía de acción ante eventos de seguridad. Conózcalos con anticipación para actuar de forma organizada.</p>
+    <p style={{color:'var(--txm)',fontSize:'.83rem',marginBottom:'.9rem',lineHeight:1.6}}>Guía de acción ante eventos de seguridad. Conózcalos con anticipación.</p>
     {protocols.map(p=>(
       <div key={p.id} className="proto-sec">
         <div className={`proto-level ${p.level}`}>{p.level==='green'?'🟢':p.level==='amber'?'🟡':'🔴'} {p.title}</div>
-        <div className="proto-steps">
-          {p.steps.map((s,i)=>(
-            <div key={i} className="proto-step"><div className="step-n">{i+1}</div><div className="step-b"><h4>{s.title}</h4><p>{s.desc}</p></div></div>
-          ))}
-        </div>
+        <div className="proto-steps">{p.steps.map((s,i)=>(
+          <div key={i} className="proto-step"><div className="step-n">{i+1}</div><div className="step-b"><h4>{s.title}</h4><p>{s.desc}</p></div></div>
+        ))}</div>
       </div>
     ))}
   </>);
 }
 
 /* ══ SEARCH ══ */
-function SearchView({searchQ,setSearchQ,searchR,setSearchR,houses,nav}){
+function SearchView({searchQ,setSearchQ,searchR,setSearchR,houses,infra,nav}){
   const doSearch=()=>{
     if(!searchQ.trim())return;
     const q=searchQ.toLowerCase();
-    setSearchR(houses.filter(h=>h.name.toLowerCase().includes(q)||h.owner.toLowerCase().includes(q)||(h.description||'').toLowerCase().includes(q)||h.phones.some(p=>p.includes(q))));
+    const h=houses.filter(x=>x.name.toLowerCase().includes(q)||x.owner.toLowerCase().includes(q)||(x.description||'').toLowerCase().includes(q)||x.phones.some(p=>p.includes(q)));
+    const inf=infra.filter(x=>x.name.toLowerCase().includes(q)||(x.responsible||'').toLowerCase().includes(q)||(x.phone||'').includes(q));
+    setSearchR({houses:h,infra:inf});
   };
   return(<>
-    <p style={{color:'var(--txm)',fontSize:'.83rem',marginBottom:'.9rem'}}>Busque la ubicación y contacto de cualquier propiedad o habitante ante un evento.</p>
+    <p style={{color:'var(--txm)',fontSize:'.83rem',marginBottom:'.9rem'}}>Busque fincas, personas o infraestructura de seguridad.</p>
     <div className="search-bar">
-      <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Nombre de finca, propietario o teléfono..." onKeyDown={e=>e.key==='Enter'&&doSearch()}/>
+      <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="Nombre, propietario, teléfono..." onKeyDown={e=>e.key==='Enter'&&doSearch()}/>
       <button className="btn btn-p" onClick={doSearch}><I.search/>Buscar</button>
     </div>
     {searchR===null&&<div className="empty"><div className="big">🔍</div><p>Ingrese un término para buscar</p></div>}
-    {searchR!==null&&searchR.length===0&&<div className="empty"><div className="big">🏚️</div><p>Sin resultados para "{searchQ}"</p></div>}
-    {searchR&&searchR.map(h=>(
-      <div key={h.id} className="result">
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:7,marginBottom:4,flexWrap:'wrap'}}><h4>{h.name}</h4><span className="badge gray">{h.type}</span></div>
-        <p>Propietario: {h.owner}</p>
-        {h.description&&<p style={{marginTop:3}}>{h.description}</p>}
-        <div style={{marginTop:7}}>{h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip">📞 {p}</a>)}</div>
-        {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)',marginTop:5,display:'inline-block'}}>🗺️ Ver ubicación</a>}
-        <div style={{marginTop:6,fontSize:'.72rem',color:'var(--g6)'}}>📅 Registrado {h.registeredAt}</div>
-      </div>
-    ))}
+    {searchR!==null&&searchR.houses.length===0&&searchR.infra.length===0&&<div className="empty"><div className="big">🏚️</div><p>Sin resultados para "{searchQ}"</p></div>}
+    {searchR&&searchR.houses.length>0&&<>
+      <p style={{fontSize:'.72rem',color:'var(--txm)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:'.55rem',fontWeight:500}}>Fincas ({searchR.houses.length})</p>
+      {searchR.houses.map(h=>(
+        <div key={h.id} className="result">
+          <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:7,marginBottom:4,flexWrap:'wrap'}}><h4>{h.name}</h4><span className="badge gray">{h.type}</span></div>
+          <p>Propietario: {h.owner}</p>
+          {h.description&&<p style={{marginTop:3}}>{h.description}</p>}
+          <div style={{marginTop:7}}>{h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip">📞 {p}</a>)}</div>
+          {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)',marginTop:5,display:'inline-block'}}>🗺️ Ver ubicación</a>}
+        </div>
+      ))}
+    </>}
+    {searchR&&searchR.infra.length>0&&<>
+      <p style={{fontSize:'.72rem',color:'var(--txm)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:'.55rem',marginTop:'.9rem',fontWeight:500}}>Infraestructura ({searchR.infra.length})</p>
+      {searchR.infra.map(item=>{
+        const t=INFRA_TYPES.find(x=>x.id===item.type)||INFRA_TYPES[4];
+        return(<div key={item.id} className="result">
+          <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:4}}><span style={{fontSize:'1.2rem'}}>{t.icon}</span><h4>{item.name}</h4><span className="badge pur">{t.label}</span></div>
+          {item.responsible&&<p>Responsable: {item.responsible}</p>}
+          {item.phone&&<a href={`tel:${item.phone}`} className="pchip" style={{marginTop:5,display:'inline-block'}}>📞 {item.phone}</a>}
+          {item.lat&&item.lng&&<a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)',marginTop:5,display:'inline-block'}}>🗺️ Ver en mapa</a>}
+        </div>);
+      })}
+    </>}
   </>);
 }
 
@@ -649,61 +921,45 @@ function AlertView({session,myHouse,addIncident}){
   const [level,setLevel]=useState('amber');
   const [desc,setDesc]=useState('');
   const [sent,setSent]=useState(false);
-
   const sendAlert=async()=>{
-    const msg=buildWAMessage(level,desc,session,myHouse);
-    const url=`https://wa.me/${WA_COORDINATOR}?text=${encodeURIComponent(msg)}`;
-    window.open(url,'_blank');
+    const msg=buildWAMsg(level,desc,session,myHouse);
+    window.open(`https://wa.me/${WA_COORDINATOR}?text=${encodeURIComponent(msg)}`,'_blank');
     await addIncident({level,desc,reporter:session.name,finca:myHouse?.name||'Sin registrar',phone:session.phone||'—'});
-    setSent(true);
-    setTimeout(()=>setSent(false),4000);
+    setSent(true); setDesc(''); setTimeout(()=>setSent(false),4000);
   };
-
-  const levelLabels={green:'🟢 Situación sospechosa',amber:'🟡 Alerta moderada',red:'🔴 Emergencia grave'};
-  const levelDescs={green:'Persona o vehículo desconocido rondando la zona.',amber:'Robo, hurto o situación de riesgo moderado.',red:'Violencia, secuestro o emergencia inmediata.'};
-
+  const descs={green:'Persona o vehículo desconocido rondando la zona.',amber:'Robo, hurto o situación de riesgo moderado.',red:'Violencia, secuestro o emergencia inmediata.'};
   return(<>
-    <div className="banner err" style={{marginBottom:'1rem'}}><span style={{fontSize:'1.4rem'}}>🚨</span><div><p>Módulo de alerta al frente</p><span>Seleccione el nivel, agregue una descripción breve y toque "Enviar por WhatsApp". Se abrirá WhatsApp con el mensaje listo para enviar al coordinador o al grupo.</span></div></div>
-
+    <div className="banner err"><span className="ico">🚨</span><div className="txt"><p>Módulo de alerta al frente</p><span>Seleccione el nivel, describa brevemente y toque "Enviar por WhatsApp". Se abrirá WhatsApp con el mensaje listo para enviar.</span></div></div>
     <div className="alert-panel">
       <div className="alert-levels">
-        {['green','amber','red'].map(l=>(
-          <button key={l} className={`al-btn ${level===l?'sel':''} ${l}`} onClick={()=>setLevel(l)}>
-            {l==='green'?'🟢 Sospechoso':l==='amber'?'🟡 Alerta':'🔴 Emergencia'}
-          </button>
-        ))}
+        {['green','amber','red'].map(l=><button key={l} className={`al-btn ${level===l?'sel':''} ${l}`} onClick={()=>setLevel(l)}>{l==='green'?'🟢 Sospechoso':l==='amber'?'🟡 Alerta':'🔴 Emergencia'}</button>)}
       </div>
       <div className="al-body">
-        <p style={{fontSize:'.82rem',color:'var(--txm)',marginBottom:'.8rem'}}>{levelDescs[level]}</p>
-        <div className="field">
-          <label>Descripción del evento</label>
-          <textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Describa brevemente qué está ocurriendo, características de personas o vehículos, dirección aproximada..." rows={4}/>
+        <p style={{fontSize:'.82rem',color:'var(--txm)',marginBottom:'.8rem'}}>{descs[level]}</p>
+        <div className="field"><label>Descripción del evento</label><textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Describa qué está ocurriendo, características de personas o vehículos..." rows={4}/></div>
+        <div style={{background:'var(--bg)',borderRadius:'var(--r8)',padding:'.75rem',marginBottom:'1rem'}}>
+          <p style={{fontWeight:500,color:'var(--txs)',marginBottom:4,fontSize:'.78rem'}}>Vista previa del mensaje:</p>
+          <pre style={{whiteSpace:'pre-wrap',fontFamily:'DM Sans,sans-serif',fontSize:'.73rem',lineHeight:1.5,color:'var(--txs)'}}>{buildWAMsg(level,desc||'(descripción pendiente)',session,myHouse)}</pre>
         </div>
-        <div style={{background:'var(--bg)',borderRadius:'var(--r8)',padding:'.8rem',marginBottom:'1rem',fontSize:'.78rem',color:'var(--txm)'}}>
-          <p style={{fontWeight:500,color:'var(--txs)',marginBottom:4}}>Vista previa del mensaje:</p>
-          <pre style={{whiteSpace:'pre-wrap',fontFamily:'DM Sans,sans-serif',fontSize:'.75rem',lineHeight:1.5,color:'var(--txs)'}}>{buildWAMessage(level,desc||'(descripción pendiente)',session,myHouse)}</pre>
-        </div>
-        <button className="btn btn-w btn-full" onClick={sendAlert} style={{fontSize:'1rem',padding:'.85rem'}}>
-          <I.wa/> Enviar alerta por WhatsApp
-        </button>
-        {sent&&<div className="banner info" style={{marginTop:'.8rem'}}><span>✅</span><p>Alerta registrada y WhatsApp abierto. Confirme el envío en la app.</p></div>}
+        <button className="btn btn-w btn-full" onClick={sendAlert} style={{fontSize:'.95rem',padding:'.8rem'}}><I.wa/> Enviar alerta por WhatsApp</button>
+        {sent&&<div className="banner info" style={{marginTop:'.8rem'}}><span className="ico">✅</span><div className="txt"><p>Alerta registrada. Confirme el envío en WhatsApp.</p></div></div>}
       </div>
     </div>
   </>);
 }
 
-/* ══ INCIDENTS VIEW ══ */
+/* ══ INCIDENTS ══ */
 function IncidentsView({incidents}){
   if(!incidents.length) return <div className="empty"><div className="big">📋</div><p>No hay alertas registradas aún</p></div>;
   return(<>
-    <p style={{fontSize:'.78rem',color:'var(--txm)',marginBottom:'.9rem'}}>{incidents.length} alerta(s) registrada(s)</p>
+    <p style={{fontSize:'.78rem',color:'var(--txm)',marginBottom:'.9rem'}}>{incidents.length} alerta(s) en el historial</p>
     {incidents.map(i=>(
       <div key={i.id} className="inc-row">
         <div className={`inc-icon ${i.level}`}>{i.level==='green'?'🟢':i.level==='amber'?'🟡':'🔴'}</div>
         <div className="inc-info">
-          <h4>{i.desc?.slice(0,80)||'Alerta sin descripción'}</h4>
-          <p>Reportado por: {i.reporter} · {i.finca}</p>
-          {i.phone&&<p>Contacto: <a href={`tel:${i.phone}`} className="pchip">📞 {i.phone}</a></p>}
+          <h4>{i.desc?.slice(0,80)||'Sin descripción'}</h4>
+          <p>{i.reporter} · {i.finca}</p>
+          {i.phone&&<p><a href={`tel:${i.phone}`} className="pchip">📞 {i.phone}</a></p>}
           <p className="inc-meta">{i.createdAt}</p>
         </div>
       </div>
@@ -716,67 +972,56 @@ function AdminReg({houses,users,deleteHouse}){
   const uName=id=>{const u=users.find(u=>u.id===id);return u?u.name:'Sin cuenta';};
   const csv=()=>{
     const rows=['Nombre,Propietario,Tipo,Teléfonos,Lat,Lng,Descripción,Fecha',...houses.map(h=>`"${h.name}","${h.owner}","${h.type}","${h.phones.join('/')}","${h.lat||''}","${h.lng||''}","${h.description||''}","${h.registeredAt||''}"`)].join('\n');
-    const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows);a.download='sango_registro.csv';a.click();
+    const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows);a.download='sango_fincas.csv';a.click();
   };
   return(<>
-    <div className="banner info" style={{marginBottom:'1rem'}}><span>📋</span><p>Registro completo de todas las propiedades del frente veredal.</p></div>
-    <div className="card">
-      <div className="card-hdr"><h3>Fincas ({houses.length})</h3><button className="btn-sm" onClick={csv}>⬇️ Exportar CSV</button></div>
-      <div className="tbl-wrap"><table>
-        <thead><tr><th>Finca</th><th>Propietario</th><th>Tipo</th><th>Teléfono</th><th>Coordenadas</th><th>Fecha</th><th>Usuario</th><th></th></tr></thead>
-        <tbody>{houses.map(h=>(
-          <tr key={h.id}>
-            <td style={{fontWeight:500}}>{h.name}</td>
-            <td>{h.owner}</td>
-            <td><span className="badge gray">{h.type}</span></td>
-            <td>{h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip" style={{display:'inline-block',margin:'1px 2px'}}>📞 {p}</a>)}</td>
-            <td style={{fontSize:'.75rem',color:'var(--txm)'}}>{h.lat&&h.lng?<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" style={{color:'var(--sky)'}}>Ver mapa</a>:'—'}</td>
-            <td style={{fontSize:'.75rem',color:'var(--txm)',whiteSpace:'nowrap'}}>{h.registeredAt||'—'}</td>
-            <td style={{fontSize:'.78rem'}}>{uName(h.userId)}</td>
-            <td><button className="btn btn-d btn-sm" onClick={()=>{if(confirm('¿Eliminar?'))deleteHouse(h.id);}}>🗑️</button></td>
-          </tr>
-        ))}</tbody>
-      </table></div>
-    </div>
+    <div className="banner info" style={{marginBottom:'1rem'}}><span className="ico">📋</span><div className="txt"><p>Registro completo de propiedades del frente.</p></div></div>
+    <div className="card"><div className="card-hdr"><h3>Fincas ({houses.length})</h3><button className="btn-sm" onClick={csv}>⬇️ Exportar CSV</button></div>
+    <div className="tbl-wrap"><table>
+      <thead><tr><th>Finca</th><th>Propietario</th><th>Tipo</th><th>Teléfono</th><th>GPS</th><th>Fecha</th><th>Usuario</th><th></th></tr></thead>
+      <tbody>{houses.map(h=>(
+        <tr key={h.id}>
+          <td style={{fontWeight:500}}>{h.name}</td><td>{h.owner}</td>
+          <td><span className="badge gray">{h.type}</span></td>
+          <td>{h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip" style={{display:'inline-block',margin:'1px 2px'}}>📞 {p}</a>)}</td>
+          <td>{h.lat&&h.lng?<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" style={{color:'var(--sky)',fontSize:'.78rem'}}>Ver mapa</a>:'—'}</td>
+          <td style={{fontSize:'.75rem',color:'var(--txm)'}}>{h.registeredAt||'—'}</td>
+          <td style={{fontSize:'.78rem'}}>{uName(h.userId)}</td>
+          <td><button className="btn btn-d btn-sm" onClick={()=>{if(confirm('¿Eliminar?'))deleteHouse(h.id);}}>🗑️</button></td>
+        </tr>
+      ))}</tbody>
+    </table></div></div>
   </>);
 }
 
-/* ══ ADMIN: EMERGENCIAS ══ */
+/* ══ ADMIN: EMERGENCY ══ */
 function AdminEmergency({emergency,persist}){
   const [ed,setEd]=useState(null);
   const [form,setForm]=useState({name:'',number:'',alt:'',type:'police',desc:''});
-  const TYPES=[{v:'police',l:'Policía'},{v:'fire',l:'Bomberos'},{v:'medical',l:'Médico/Ambulancia'},{v:'community',l:'Comunidad/Frente'},{v:'other',l:'Otro'}];
-  const openEdit=n=>{setEd(n.id);setForm({name:n.name,number:n.number,alt:n.alt||'',type:n.type,desc:n.desc});};
-  const openNew=()=>{setEd('new');setForm({name:'',number:'',alt:'',type:'other',desc:''}); };
-  const save=async()=>{
-    if(!form.name||!form.number)return;
-    let list;
-    if(ed==='new') list=[...emergency,{id:'e'+Date.now(),...form}];
-    else list=emergency.map(e=>e.id===ed?{...e,...form}:e);
-    await persist(list); setEd(null);
-  };
-  const del=async id=>{if(confirm('¿Eliminar?'))await persist(emergency.filter(e=>e.id!==id));};
+  const TYPES=[{v:'police',l:'Policía'},{v:'fire',l:'Bomberos'},{v:'medical',l:'Médico'},{v:'community',l:'Comunidad'},{v:'other',l:'Otro'}];
+  const save=async()=>{ if(!form.name||!form.number)return; let list; if(ed==='new')list=[...emergency,{id:'e'+Date.now(),...form}]; else list=emergency.map(e=>e.id===ed?{...e,...form}:e); await persist(list); setEd(null); };
+  const del=async id=>{ if(confirm('¿Eliminar?'))await persist(emergency.filter(e=>e.id!==id)); };
   const cols={police:'var(--sky)',fire:'var(--red)',medical:'var(--amb)',community:'var(--g7)',other:'var(--pur)'};
   return(<>
     <div className="inline-hint">✏️ Solo coordinadores pueden modificar estos datos</div>
-    <button className="btn btn-p" style={{marginBottom:'1rem'}} onClick={openNew}><I.plus/>Agregar número</button>
+    <button className="btn btn-p" style={{marginBottom:'1rem'}} onClick={()=>{setEd('new');setForm({name:'',number:'',alt:'',type:'other',desc:''});}}><I.plus/>Agregar</button>
     {emergency.map(n=>(
       <div key={n.id} className={`em-card ${n.type}`} style={{marginBottom:'.6rem',flexWrap:'wrap',gap:7}}>
         <div className="em-ico">{n.type==='police'?<I.shield/>:n.type==='community'?<I.users/>:<I.phone/>}</div>
         <div className="em-info" style={{flex:1}}><h4>{n.name}</h4><div className="em-num" style={{fontSize:'1.05rem',color:cols[n.type]||cols.other}}>{n.number}</div><small>{n.desc}{n.alt&&` · Alt: ${n.alt}`}</small></div>
-        <div style={{display:'flex',gap:5}}><button className="btn-sm" onClick={()=>openEdit(n)}>✏️ Editar</button><button className="btn btn-d btn-sm" onClick={()=>del(n.id)}>🗑️</button></div>
+        <div style={{display:'flex',gap:5}}><button className="btn-sm" onClick={()=>{setEd(n.id);setForm({name:n.name,number:n.number,alt:n.alt||'',type:n.type,desc:n.desc});}}>✏️</button><button className="btn btn-d btn-sm" onClick={()=>del(n.id)}>🗑️</button></div>
       </div>
     ))}
     {ed&&<div className="modal-ov"><div className="modal">
-      <div className="modal-hdr"><h3>{ed==='new'?'Nuevo número':'Editar número'}</h3><button className="btn-x" onClick={()=>setEd(null)}>×</button></div>
+      <div className="modal-hdr"><h3>{ed==='new'?'Nuevo número':'Editar'}</h3><button className="btn-x" onClick={()=>setEd(null)}>×</button></div>
       <div className="modal-body">
         <div className="form-row">
           <div className="field"><label>Nombre *</label><input value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Policía Nacional"/></div>
           <div className="field"><label>Tipo</label><select value={form.type} onChange={e=>setForm(f=>({...f,type:e.target.value}))}>{TYPES.map(t=><option key={t.v} value={t.v}>{t.l}</option>)}</select></div>
         </div>
         <div className="form-row">
-          <div className="field"><label>Número principal *</label><input value={form.number} onChange={e=>setForm(f=>({...f,number:e.target.value}))} placeholder="112" inputMode="tel"/></div>
-          <div className="field"><label>Número alternativo</label><input value={form.alt} onChange={e=>setForm(f=>({...f,alt:e.target.value}))} placeholder="310..." inputMode="tel"/></div>
+          <div className="field"><label>Número *</label><input value={form.number} onChange={e=>setForm(f=>({...f,number:e.target.value}))} placeholder="112" inputMode="tel"/></div>
+          <div className="field"><label>Alternativo</label><input value={form.alt} onChange={e=>setForm(f=>({...f,alt:e.target.value}))} placeholder="310..." inputMode="tel"/></div>
         </div>
         <div className="field"><label>Descripción</label><input value={form.desc} onChange={e=>setForm(f=>({...f,desc:e.target.value}))} placeholder="Línea 24h..."/></div>
       </div>
@@ -785,46 +1030,39 @@ function AdminEmergency({emergency,persist}){
   </>);
 }
 
-/* ══ ADMIN: PROTOCOLOS ══ */
+/* ══ ADMIN: PROTOCOL ══ */
 function AdminProtocol({protocols,persist}){
   const [ed,setEd]=useState(null);
   const [form,setForm]=useState({level:'green',title:'',steps:[{title:'',desc:''}]});
-  const LEVELS=[{v:'green',l:'🟢 Normal'},{v:'amber',l:'🟡 Alerta moderada'},{v:'red',l:'🔴 Emergencia grave'}];
-  const save=async()=>{
-    if(!form.title)return;
-    const clean={...form,steps:form.steps.filter(s=>s.title.trim())};
-    let list;
-    if(ed==='new') list=[...protocols,{id:'p'+Date.now(),...clean}];
-    else list=protocols.map(x=>x.id===ed?{...x,...clean}:x);
-    await persist(list); setEd(null);
-  };
-  const del=async id=>{if(confirm('¿Eliminar protocolo?'))await persist(protocols.filter(x=>x.id!==id));};
-  const setStep=(i,k,v)=>setForm(f=>{const steps=[...f.steps];steps[i]={...steps[i],[k]:v};return{...f,steps};});
+  const LEVELS=[{v:'green',l:'🟢 Normal'},{v:'amber',l:'🟡 Moderado'},{v:'red',l:'🔴 Grave'}];
+  const save=async()=>{ if(!form.title)return; const clean={...form,steps:form.steps.filter(s=>s.title.trim())}; let list; if(ed==='new')list=[...protocols,{id:'p'+Date.now(),...clean}]; else list=protocols.map(x=>x.id===ed?{...x,...clean}:x); await persist(list); setEd(null); };
+  const del=async id=>{ if(confirm('¿Eliminar?'))await persist(protocols.filter(x=>x.id!==id)); };
+  const setStep=(i,k,v)=>setForm(f=>{ const steps=[...f.steps];steps[i]={...steps[i],[k]:v};return{...f,steps}; });
   return(<>
     <div className="inline-hint">✏️ Solo coordinadores pueden modificar los protocolos</div>
-    <button className="btn btn-p" style={{marginBottom:'1rem'}} onClick={()=>{setEd('new');setForm({level:'green',title:'',steps:[{title:'',desc:''}]})}}><I.plus/>Nuevo protocolo</button>
+    <button className="btn btn-p" style={{marginBottom:'1rem'}} onClick={()=>{setEd('new');setForm({level:'green',title:'',steps:[{title:'',desc:''}]});}}><I.plus/>Nuevo protocolo</button>
     {protocols.map(p=>(
       <div key={p.id} className="card" style={{marginBottom:'.7rem'}}>
         <div className="card-hdr">
           <div><div className={`proto-level ${p.level}`}>{p.level==='green'?'🟢':p.level==='amber'?'🟡':'🔴'} {p.title}</div><p style={{fontSize:'.75rem',color:'var(--txm)'}}>{p.steps.length} pasos</p></div>
-          <div style={{display:'flex',gap:5}}><button className="btn-sm" onClick={()=>{setEd(p.id);setForm({level:p.level,title:p.title,steps:p.steps.map(s=>({...s}))});}}>✏️ Editar</button><button className="btn btn-d btn-sm" onClick={()=>del(p.id)}>🗑️</button></div>
+          <div style={{display:'flex',gap:5}}><button className="btn-sm" onClick={()=>{setEd(p.id);setForm({level:p.level,title:p.title,steps:p.steps.map(s=>({...s}))});}}>✏️</button><button className="btn btn-d btn-sm" onClick={()=>del(p.id)}>🗑️</button></div>
         </div>
         <div className="card-body" style={{paddingTop:'.7rem'}}>
           {p.steps.map((s,i)=><div key={i} style={{display:'flex',gap:7,marginBottom:7}}><div className="step-n" style={{width:24,height:24,fontSize:'.73rem'}}>{i+1}</div><div><p style={{fontWeight:500,fontSize:'.8rem'}}>{s.title}</p><p style={{fontSize:'.76rem',color:'var(--txm)',lineHeight:1.5}}>{s.desc}</p></div></div>)}
         </div>
       </div>
     ))}
-    {ed&&<div className="modal-ov"><div className="modal" style={{maxWidth:560}}>
-      <div className="modal-hdr"><h3>{ed==='new'?'Nuevo protocolo':'Editar protocolo'}</h3><button className="btn-x" onClick={()=>setEd(null)}>×</button></div>
+    {ed&&<div className="modal-ov"><div className="modal" style={{maxWidth:540}}>
+      <div className="modal-hdr"><h3>{ed==='new'?'Nuevo protocolo':'Editar'}</h3><button className="btn-x" onClick={()=>setEd(null)}>×</button></div>
       <div className="modal-body">
         <div className="form-row">
           <div className="field"><label>Nivel</label><select value={form.level} onChange={e=>setForm(f=>({...f,level:e.target.value}))}>{LEVELS.map(l=><option key={l.v} value={l.v}>{l.l}</option>)}</select></div>
           <div className="field"><label>Título *</label><input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="Robo o hurto..."/></div>
         </div>
         <div className="divider"/>
-        <p style={{fontWeight:500,fontSize:'.85rem',marginBottom:'.7rem'}}>Pasos de acción</p>
+        <p style={{fontWeight:500,fontSize:'.85rem',marginBottom:'.7rem'}}>Pasos</p>
         {form.steps.map((s,i)=>(
-          <div key={i} style={{background:'var(--bg)',borderRadius:'var(--r8)',padding:'.85rem',marginBottom:'.55rem',border:'1px solid var(--bdr)'}}>
+          <div key={i} style={{background:'var(--bg)',borderRadius:'var(--r8)',padding:'.8rem',marginBottom:'.5rem',border:'1px solid var(--bdr)'}}>
             <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}><span className="badge gray">Paso {i+1}</span>{form.steps.length>1&&<button className="btn btn-d btn-sm" onClick={()=>setForm(f=>({...f,steps:f.steps.filter((_,idx)=>idx!==i)}))}>🗑️</button>}</div>
             <div className="field" style={{marginBottom:'.45rem'}}><label>Título</label><input value={s.title} onChange={e=>setStep(i,'title',e.target.value)} placeholder="Llame al 112..."/></div>
             <div className="field" style={{marginBottom:0}}><label>Descripción</label><textarea value={s.desc} onChange={e=>setStep(i,'desc',e.target.value)} rows={2}/></div>
@@ -837,42 +1075,37 @@ function AdminProtocol({protocols,persist}){
   </>);
 }
 
-/* ══ ADMIN: USUARIOS ══ */
+/* ══ ADMIN: USERS ══ */
 function AdminUsers({users,session,persistUser,deleteUser}){
   const [confirm,setConfirm]=useState(null);
   const cu=confirm?users.find(u=>u.id===confirm.id):null;
-  const doConfirm=async()=>{
-    if(confirm.action==='promote') await persistUser({...cu,role:'admin'});
-    else if(confirm.action==='demote') await persistUser({...cu,role:'user'});
-    else if(confirm.action==='delete') await deleteUser(cu.id);
-    setConfirm(null);
-  };
-  const msgs={promote:`¿Designar a "${cu?.name}" como coordinador? Podrá editar emergencias, protocolos y gestionar usuarios.`,demote:`¿Quitar permisos de coordinador a "${cu?.name}"? Pasará a ser habitante.`,delete:`¿Eliminar a "${cu?.name}"? Esta acción no se puede deshacer.`};
+  const doConfirm=async()=>{ if(confirm.action==='promote')await persistUser({...cu,role:'admin'}); else if(confirm.action==='demote')await persistUser({...cu,role:'user'}); else if(confirm.action==='delete')await deleteUser(cu.id); setConfirm(null); };
+  const msgs={promote:`¿Designar a "${cu?.name}" como coordinador?`,demote:`¿Quitar permisos de coordinador a "${cu?.name}"?`,delete:`¿Eliminar a "${cu?.name}"? No se puede deshacer.`};
   return(<>
-    <div className="banner info" style={{marginBottom:'1rem'}}><span>🔑</span><div><p>Gestión de roles</p><span>Puede haber varios coordinadores simultáneamente — uno por sector de la vereda, por ejemplo.</span></div></div>
+    <div className="banner info" style={{marginBottom:'1rem'}}><span className="ico">🔑</span><div className="txt"><p>Gestión de roles y accesos</p><span>Puede haber varios coordinadores — uno por sector de la vereda.</span></div></div>
     <div className="card"><div className="card-hdr"><h3>Usuarios ({users.length})</h3><span className="badge amber">{users.filter(u=>u.role==='admin').length} coordinador(es)</span></div>
     <div className="tbl-wrap"><table>
       <thead><tr><th>Nombre</th><th>Usuario</th><th>Teléfono</th><th>Rol</th><th>Acciones</th></tr></thead>
       <tbody>{users.map(u=>(
         <tr key={u.id}>
           <td><div style={{display:'flex',alignItems:'center',gap:7}}>
-            <div style={{width:28,height:28,background:u.role==='admin'?'var(--amb0)':'var(--g1)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'.72rem',fontWeight:600,color:u.role==='admin'?'var(--amb)':'var(--g7)',flexShrink:0}}>{u.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</div>
-            <span style={{fontWeight:500}}>{u.name}</span>{u.id===session.id&&<span className="badge sky" style={{fontSize:'.65rem'}}>yo</span>}
+            <div style={{width:26,height:26,background:u.role==='admin'?'var(--amb0)':'var(--g1)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'.7rem',fontWeight:600,color:u.role==='admin'?'var(--amb)':'var(--g7)',flexShrink:0}}>{u.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</div>
+            <span style={{fontWeight:500}}>{u.name}</span>{u.id===session.id&&<span className="badge sky" style={{fontSize:'.63rem'}}>yo</span>}
           </div></td>
           <td style={{color:'var(--txm)',fontSize:'.8rem'}}>{u.username}</td>
           <td>{u.phone?<a href={`tel:${u.phone}`} className="pchip">📞 {u.phone}</a>:'—'}</td>
           <td><span className={`badge ${u.role==='admin'?'amber':'green'}`}>{u.role==='admin'?'⭐ Coordinador':'Habitante'}</span></td>
           <td>{u.id!==session.id?(
             <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-              {u.role==='user'?<button className="btn-sm" style={{background:'var(--amb0)',color:'var(--amb)',borderColor:'#fac775'}} onClick={()=>setConfirm({id:u.id,action:'promote'})}>⭐ Coordinador</button>:<button className="btn-sm" onClick={()=>setConfirm({id:u.id,action:'demote'})}>↓ Quitar rol</button>}
+              {u.role==='user'?<button className="btn-sm" style={{background:'var(--amb0)',color:'var(--amb)',borderColor:'#fac775'}} onClick={()=>setConfirm({id:u.id,action:'promote'})}>⭐</button>:<button className="btn-sm" onClick={()=>setConfirm({id:u.id,action:'demote'})}>↓</button>}
               <button className="btn-sm" style={{color:'var(--red)',borderColor:'#f7c1c1'}} onClick={()=>setConfirm({id:u.id,action:'delete'})}>🗑️</button>
             </div>
-          ):<span style={{fontSize:'.75rem',color:'var(--txm)',fontStyle:'italic'}}>Mi cuenta</span>}</td>
+          ):<span style={{fontSize:'.72rem',color:'var(--txm)',fontStyle:'italic'}}>Mi cuenta</span>}</td>
         </tr>
       ))}</tbody>
     </table></div></div>
-    {confirm&&<div className="modal-ov"><div className="modal" style={{maxWidth:400}}>
-      <div className="modal-hdr"><h3>{confirm.action==='promote'?'Designar coordinador':confirm.action==='demote'?'Revocar permisos':'Eliminar usuario'}</h3><button className="btn-x" onClick={()=>setConfirm(null)}>×</button></div>
+    {confirm&&<div className="modal-ov"><div className="modal" style={{maxWidth:380}}>
+      <div className="modal-hdr"><h3>Confirmar acción</h3><button className="btn-x" onClick={()=>setConfirm(null)}>×</button></div>
       <div className="modal-body"><p style={{fontSize:'.88rem',lineHeight:1.6,color:'var(--txs)'}}>{msgs[confirm.action]}</p></div>
       <div className="modal-ftr"><button className="btn btn-s" onClick={()=>setConfirm(null)}>Cancelar</button><button className={`btn ${confirm.action==='delete'?'btn-d':'btn-p'}`} onClick={doConfirm}>{confirm.action==='promote'?'Sí, designar':confirm.action==='demote'?'Sí, revocar':'Sí, eliminar'}</button></div>
     </div></div>}
@@ -880,15 +1113,11 @@ function AdminUsers({users,session,persistUser,deleteUser}){
 }
 
 /* ══ HOUSE MODAL ══ */
-function HouseModal({onClose,onSave,existing,session}){
-  const [form,setForm]=useState({name:existing?.name||'',owner:existing?.owner||session.name||'',phones:existing?.phones||[session.phone||''],type:existing?.type||'finca',description:existing?.description||'',lat:existing?.lat||'',lng:existing?.lng||''});
+function HouseModal({onClose,onSave,existing,session,preLatLng}){
+  const [form,setForm]=useState({name:existing?.name||'',owner:existing?.owner||session.name||'',phones:existing?.phones||[session.phone||''],type:existing?.type||'finca',description:existing?.description||'',lat:preLatLng?.lat||existing?.lat||'',lng:preLatLng?.lng||existing?.lng||''});
   const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
   const setPhone=(i,v)=>setForm(f=>{const phones=[...f.phones];phones[i]=v;return{...f,phones};});
-  const save=()=>{
-    if(!form.name||!form.owner)return;
-    const id=existing?.id||('h'+Date.now());
-    onSave({...form,id,phones:form.phones.filter(p=>p.trim()),userId:session.id,registeredAt:existing?.registeredAt||new Date().toISOString().slice(0,10)});
-  };
+  const save=()=>{ if(!form.name||!form.owner)return; const id=existing?.id||('h'+Date.now()); onSave({...form,id,phones:form.phones.filter(p=>p.trim()),userId:session.id,registeredAt:existing?.registeredAt||new Date().toISOString().slice(0,10)}); };
   return(
     <div className="modal-ov"><div className="modal">
       <div className="modal-hdr"><h3>{existing?'Editar mi finca':'Registrar finca / casa'}</h3><button className="btn-x" onClick={onClose}>×</button></div>
@@ -901,23 +1130,20 @@ function HouseModal({onClose,onSave,existing,session}){
         <div className="field">
           <label>Teléfonos</label>
           {form.phones.map((p,i)=>(
-            <div key={i} className="phone-row">
-              <input value={p} onChange={e=>setPhone(i,e.target.value)} placeholder={`Teléfono ${i+1}`} inputMode="tel"/>
-              {form.phones.length>1&&<button className="del-btn" onClick={()=>setForm(f=>({...f,phones:f.phones.filter((_,idx)=>idx!==i)}))}>×</button>}
-            </div>
+            <div key={i} className="phone-row"><input value={p} onChange={e=>setPhone(i,e.target.value)} placeholder={`Teléfono ${i+1}`} inputMode="tel"/>{form.phones.length>1&&<button className="del-btn" onClick={()=>setForm(f=>({...f,phones:f.phones.filter((_,idx)=>idx!==i)}))}>×</button>}</div>
           ))}
           <button className="btn-add" onClick={()=>setForm(f=>({...f,phones:[...f.phones,'']}))}>+ Agregar teléfono</button>
         </div>
         <div style={{background:'var(--g0)',border:'1px solid var(--g2)',borderRadius:'var(--r8)',padding:'.7rem',marginBottom:'.9rem'}}>
-          <p style={{fontSize:'.78rem',fontWeight:500,color:'var(--g7)',marginBottom:'.4rem'}}>📍 Coordenadas GPS</p>
-          <p style={{fontSize:'.72rem',color:'var(--txm)',marginBottom:'.55rem',lineHeight:1.5}}>Google Maps → mantenga presionado sobre su finca → copie los números que aparecen abajo.</p>
+          <p style={{fontSize:'.78rem',fontWeight:500,color:'var(--g7)',marginBottom:'.35rem'}}>📍 Coordenadas GPS</p>
+          <p style={{fontSize:'.72rem',color:'var(--txm)',marginBottom:'.5rem',lineHeight:1.5}}>Google Maps → mantenga presionado sobre su finca → copie los números que aparecen.</p>
           <div className="form-row">
             <div className="field" style={{marginBottom:0}}><label>Latitud</label><input value={form.lat} onChange={set('lat')} placeholder="6.2948" inputMode="decimal"/></div>
             <div className="field" style={{marginBottom:0}}><label>Longitud</label><input value={form.lng} onChange={set('lng')} placeholder="-75.4599" inputMode="decimal"/></div>
           </div>
           {form.lat&&form.lng&&<a href={`https://www.google.com/maps?q=${form.lat},${form.lng}`} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',marginTop:'.45rem',fontSize:'.75rem',color:'var(--sky)',textDecoration:'underline'}}>🗺️ Verificar en Google Maps</a>}
         </div>
-        <div className="field"><label>Referencia de ubicación</label><textarea value={form.description} onChange={set('description')} placeholder="Casa blanca, portón azul, a 200m de la escuela..." rows={2}/></div>
+        <div className="field"><label>Referencia de ubicación</label><textarea value={form.description} onChange={set('description')} placeholder="Casa blanca, portón azul, 200m de la escuela..." rows={2}/></div>
       </div>
       <div className="modal-ftr"><button className="btn btn-s" onClick={onClose}>Cancelar</button><button className="btn btn-p" onClick={save}>💾 Guardar</button></div>
     </div></div>
