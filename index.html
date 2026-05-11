@@ -58,10 +58,20 @@ h1,h2,h3{font-family:'Fraunces',serif}
 .app{display:flex;min-height:100vh}
 .sidebar{width:240px;background:var(--g9);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:200;transform:translateX(-100%);transition:transform .25s}
 .sidebar.open{transform:translateX(0)}
-@media(min-width:768px){.sidebar{transform:translateX(0)}.main{margin-left:240px}.hamburger{display:none!important}}
+@media(min-width:768px){.sidebar{transform:translateX(0)}.main{margin-left:240px}.hamburger{display:none!important}.bottom-nav{display:none!important}}
 .main{flex:1;min-height:100vh}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:199}
 .overlay.show{display:block}
+/* ── BOTTOM NAV (mobile only) ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:150;background:var(--g9);border-top:1px solid rgba(255,255,255,.1);display:flex;align-items:stretch;height:58px;padding-bottom:env(safe-area-inset-bottom)}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--g5);border:none;background:none;font-family:'DM Sans',sans-serif;padding:6px 2px;transition:color .15s;-webkit-tap-highlight-color:transparent;position:relative}
+.bn-item:active{background:rgba(255,255,255,.05)}
+.bn-item.active{color:var(--g3)}
+.bn-item svg{width:20px;height:20px;flex-shrink:0}
+.bn-item span{font-size:.6rem;font-weight:500;line-height:1;text-align:center;white-space:nowrap}
+.bn-alert{background:var(--red);color:#fff;border-radius:50%;width:8px;height:8px;position:absolute;top:6px;right:calc(50% - 14px)}
+/* page padding bottom on mobile to avoid bottom nav overlap */
+@media(max-width:767px){.page{padding-bottom:4.5rem}}
 .sb-brand{padding:1.2rem 1rem .9rem;border-bottom:1px solid rgba(255,255,255,.08)}
 .sb-brand h1{font-size:.95rem;color:var(--g2);line-height:1.2}
 .sb-brand span{font-size:.68rem;color:var(--g5);font-family:'DM Sans',sans-serif;font-weight:300}
@@ -575,7 +585,7 @@ function App(){
         </div>
         <div className="page">
           {view==='dashboard'&&<Dashboard houses={houses} session={session} myHouse={myHouse} nav={nav} emergency={emergency} incidents={incidents} infra={infra}/>}
-          {view==='map'&&<MapView houses={houses} infra={infra} session={session} myHouse={myHouse} onRegisterHouse={()=>setModal('house')} onRegisterInfra={()=>setModal({type:'infra',item:null})} onMapClick={(ll,mode)=>{ setPendingLatLng(ll); setModal(mode==='infra'?{type:'infra',item:null}:'house'); }}/>}
+          {view==='map'&&<MapView houses={houses} infra={infra} session={session} myHouse={myHouse} onRegisterHouse={()=>setModal('house')} onRegisterInfra={()=>setModal({type:'infra',item:null})} onMapClick={(ll,mode)=>{ setPendingLatLng(ll); setModal(mode==='infra'?{type:'infra',item:null}:'house'); }} onEditInfra={item=>setModal({type:'infra',item})}/>}
           {view==='emergency'&&<EmergencyView numbers={emergency}/>}
           {view==='protocol'&&<ProtocolView protocols={protocols}/>}
           {view==='search'&&<SearchView searchQ={searchQ} setSearchQ={setSearchQ} searchR={searchR} setSearchR={setSearchR} houses={houses} infra={infra} nav={nav}/>}
@@ -592,6 +602,26 @@ function App(){
 
       {modal==='house'&&<HouseModal onClose={()=>{setModal(null);setPendingLatLng(null);}} onSave={async d=>{await persistHouse(d);setModal(null);setPendingLatLng(null);}} existing={myHouse} session={session} preLatLng={pendingLatLng} houses={houses}/>}
       {modal?.type==='infra'&&<InfraModal onClose={()=>{setModal(null);setPendingLatLng(null);}} onSave={async d=>{await persistInfra(d);setModal(null);setPendingLatLng(null);}} session={session} existing={modal.item} preLatLng={pendingLatLng}/>}
+
+      {/* ── Barra de navegación inferior (solo móvil) ── */}
+      <nav className="bottom-nav">
+        {[
+          {id:'dashboard', label:'Inicio',  icon:<I.home/>},
+          {id:'map',       label:'Mapa',    icon:<I.map/>},
+          {id:'alert',     label:'Alerta',  icon:<I.alert/>, dot:true},
+          {id:'infra',     label:'Cámaras', icon:<I.camera/>},
+          {id:'_menu',     label:'Menú ☰',  icon:<I.menu/>},
+        ].map(item=>(
+          <button key={item.id}
+            className={`bn-item ${view===item.id?'active':''}`}
+            onClick={()=>{ if(item.id==='_menu') setSbOpen(o=>!o); else nav(item.id); }}
+          >
+            {item.dot&&<span className="bn-alert"/>}
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
@@ -679,7 +709,7 @@ function Dashboard({houses,session,myHouse,nav,emergency,incidents,infra}){
 }
 
 /* ══ MAP VIEW ══ */
-function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,onMapClick}){
+function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,onMapClick,onEditInfra}){
   const [tab,setTab]=useState('fincas');
   const [showInfra,setShowInfra]=useState(true);
   const [clickMode,setClickMode]=useState(null); // null | 'house' | 'infra'
@@ -758,8 +788,11 @@ function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,o
               <p>{t.label} · <span className={`badge ${item.status==='activo'?'green':'amber'}`}>{item.status==='activo'?'✅ Activo':'⚠️ Inactivo'}</span></p>
               {item.responsible&&<p>Responsable: {item.responsible}</p>}
               {item.description&&<p>{item.description}</p>}
-              {item.phone&&<a href={`tel:${item.phone}`} className="pchip" style={{marginTop:5,display:'inline-block'}}>📞 {item.phone}</a>}
-              {item.lat&&item.lng&&<a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver</a>}
+              <div style={{marginTop:6,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+                {item.phone&&<a href={`tel:${item.phone}`} className="pchip">📞 {item.phone}</a>}
+                {item.lat&&item.lng&&<a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver</a>}
+                <button className="btn-sm" style={{marginLeft:'auto'}} onClick={()=>onEditInfra(item)}>✏️ Editar</button>
+              </div>
             </div>
           </div>
         );
