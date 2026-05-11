@@ -396,47 +396,45 @@ function GMap({houses,infra,showInfra,onMapClick,clickable}){
 
   function renderMarkers(map,houses,infra,showInfra){
     const iw = new window.google.maps.InfoWindow();
-    // House markers
+
+    // Helper: create emoji SVG marker icon
+    const emojiIcon=(emoji,bg,size=32)=>{
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size+8}" viewBox="0 0 ${size} ${size+8}">
+        <circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${bg}" stroke="white" stroke-width="2"/>
+        <text x="${size/2}" y="${size/2+5}" text-anchor="middle" font-size="${size*0.55}px">${emoji}</text>
+        <polygon points="${size/2-4},${size} ${size/2+4},${size} ${size/2},${size+8}" fill="${bg}"/>
+      </svg>`;
+      return {url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg), scaledSize:new window.google.maps.Size(size,size+8), anchor:new window.google.maps.Point(size/2,size+8)};
+    };
+
+    // House markers — 🏡
     houses.forEach(h=>{
       if(!h.lat||!h.lng) return;
       const marker = new window.google.maps.Marker({
         position:{lat:parseFloat(h.lat),lng:parseFloat(h.lng)},
-        map,
-        title:h.name,
-        icon:{
-          path:window.google.maps.SymbolPath.CIRCLE,
-          scale:10,
-          fillColor:'#1a4a20',
-          fillOpacity:1,
-          strokeColor:'#fff',
-          strokeWeight:2,
-        }
+        map, title:h.name,
+        icon: emojiIcon('🏡','#1a4a20',36),
       });
       marker.addListener('click',()=>{
-        iw.setContent(`<div style="font-family:sans-serif;padding:4px;min-width:160px"><strong style="font-size:13px">${h.name}</strong><p style="font-size:11px;color:#555;margin:3px 0">${h.owner} · ${h.type}</p><p style="font-size:11px;color:#555;margin:2px 0">${h.description||''}</p>${h.phones.map(p=>`<a href="tel:${p}" style="font-size:12px;color:#185fa5;display:block;margin-top:4px">📞 ${p}</a>`).join('')}</div>`);
+        iw.setContent(`<div style="font-family:sans-serif;padding:4px 6px;min-width:170px"><strong style="font-size:13px">🏡 ${h.name}</strong><p style="font-size:11px;color:#555;margin:3px 0">${h.owner} · ${h.type}</p><p style="font-size:11px;color:#555;margin:2px 0">${h.description||''}</p>${h.phones.map(p=>`<a href="tel:${p}" style="font-size:12px;color:#185fa5;display:block;margin-top:4px">📞 ${p}</a>`).join('')}</div>`);
         iw.open(map,marker);
       });
       markersRef.current.push(marker);
     });
-    // Infra markers
+
+    // Infra markers — emoji by type
     if(showInfra) infra.forEach(item=>{
       if(!item.lat||!item.lng) return;
-      const t = INFRA_TYPES.find(x=>x.id===item.type)||INFRA_TYPES[4];
+      const t=INFRA_TYPES.find(x=>x.id===item.type)||INFRA_TYPES[4];
+      const inactive = item.status!=='activo';
       const marker = new window.google.maps.Marker({
         position:{lat:parseFloat(item.lat),lng:parseFloat(item.lng)},
-        map,
-        title:item.name,
-        icon:{
-          path:window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-          scale:8,
-          fillColor:t.color,
-          fillOpacity:1,
-          strokeColor:'#fff',
-          strokeWeight:1.5,
-        }
+        map, title:item.name,
+        icon: emojiIcon(t.icon, inactive?'#888':t.color, 34),
+        opacity: inactive ? 0.6 : 1,
       });
       marker.addListener('click',()=>{
-        iw.setContent(`<div style="font-family:sans-serif;padding:4px;min-width:140px"><strong style="font-size:13px">${t.icon} ${item.name}</strong><p style="font-size:11px;color:#555;margin:3px 0">${t.label} · ${item.status==='activo'?'✅ Activo':'⚠️ Inactivo'}</p><p style="font-size:11px;color:#555;margin:2px 0">${item.responsible||''}</p>${item.phone?`<a href="tel:${item.phone}" style="font-size:12px;color:#185fa5;display:block;margin-top:4px">📞 ${item.phone}</a>`:''}</div>`);
+        iw.setContent(`<div style="font-family:sans-serif;padding:4px 6px;min-width:160px"><strong style="font-size:13px">${t.icon} ${item.name}</strong><p style="font-size:11px;color:#555;margin:3px 0">${t.label} · ${item.status==='activo'?'✅ Activo':'⚠️ Inactivo'}</p>${item.responsible?`<p style="font-size:11px;color:#555;margin:2px 0">${item.responsible}</p>`:''}</p>${item.phone?`<a href="tel:${item.phone}" style="font-size:12px;color:#185fa5;display:block;margin-top:4px">📞 ${item.phone}</a>`:''}</div>`);
         iw.open(map,marker);
       });
       markersRef.current.push(marker);
@@ -463,7 +461,7 @@ function App(){
   const [protocols,setProtocols]=useState(()=>ls('s_protocols',INIT_PROTOCOLS));
   const [incidents,setIncidents]=useState(()=>ls('s_incidents',[]));
   const [infra,setInfra]=useState(()=>ls('s_infra',INIT_INFRA));
-  const [modal,setModal]=useState(null);
+  const [modal,setModal]=useState(null); // null | 'house' | {type:'infra', item?:existing}
   const [searchQ,setSearchQ]=useState('');
   const [searchR,setSearchR]=useState(null);
   const [pendingLatLng,setPendingLatLng]=useState(null);
@@ -501,10 +499,21 @@ function App(){
   const deleteInfra=async id=>{ setInfra(p=>p.filter(x=>x.id!==id)); if(fbOk) await fbDel('sango_infra',id); };
   const addIncident=async inc=>{ const full={...inc,id:'i'+Date.now(),createdAt:new Date().toLocaleString('es-CO')}; setIncidents(p=>[full,...p]); if(fbOk) await fbSet('sango_incidents',full.id,full); };
 
+  const logout=()=>{ localStorage.removeItem('s_session'); setSession(null); };
+
   if(!session) return(
     <LoginPage
       users={users}
-      onLogin={(u,p)=>{ const f=users.find(x=>x.username===u&&x.password===p); if(f){setSession(f);return true;} return false; }}
+      onLogin={(u,p,remember)=>{
+        const f=users.find(x=>x.username===u&&x.password===p);
+        if(f){
+          if(!remember) localStorage.removeItem('s_session');
+          setSession(f);
+          if(remember) lsSet('s_session',f);
+          return true;
+        }
+        return false;
+      }}
       onNewUser={async d=>{ const nu={id:'u'+Date.now(),...d,role:'user'}; setUsers(p=>[...p,nu]); if(fbOk) await fbSet('sango_users',nu.id,nu); setSession(nu); }}
     />
   );
@@ -555,16 +564,23 @@ function App(){
           <div style={{display:'flex',alignItems:'center',gap:8}}>
             <span title={fbOk?'Firebase sincronizado':'Modo local'}><span className={`sync-dot ${fbOk?'ok':'off'}`}/><span style={{fontSize:'.68rem',color:'var(--txm)'}}>{fbOk?'Sync':'Local'}</span></span>
             {session.role==='admin'&&<span className="tb-badge">Admin</span>}
+            <button
+              onClick={()=>{ if(confirm('¿Cerrar sesión?')) logout(); }}
+              title="Cerrar sesión"
+              style={{display:'flex',alignItems:'center',gap:5,padding:'5px 10px',background:'var(--red0)',border:'1px solid #f7c1c1',borderRadius:'var(--r8)',cursor:'pointer',fontSize:'.75rem',fontWeight:500,color:'var(--red)',fontFamily:'DM Sans,sans-serif'}}
+            >
+              <I.out/> Salir
+            </button>
           </div>
         </div>
         <div className="page">
           {view==='dashboard'&&<Dashboard houses={houses} session={session} myHouse={myHouse} nav={nav} emergency={emergency} incidents={incidents} infra={infra}/>}
-          {view==='map'&&<MapView houses={houses} infra={infra} session={session} myHouse={myHouse} onRegisterHouse={()=>setModal('house')} onRegisterInfra={()=>setModal('infra')} onMapClick={ll=>{setPendingLatLng(ll);setModal('house');}}/>}
+          {view==='map'&&<MapView houses={houses} infra={infra} session={session} myHouse={myHouse} onRegisterHouse={()=>setModal('house')} onRegisterInfra={()=>setModal({type:'infra',item:null})} onMapClick={(ll,mode)=>{ setPendingLatLng(ll); setModal(mode==='infra'?{type:'infra',item:null}:'house'); }}/>}
           {view==='emergency'&&<EmergencyView numbers={emergency}/>}
           {view==='protocol'&&<ProtocolView protocols={protocols}/>}
           {view==='search'&&<SearchView searchQ={searchQ} setSearchQ={setSearchQ} searchR={searchR} setSearchR={setSearchR} houses={houses} infra={infra} nav={nav}/>}
-          {view==='infra'&&<InfraView infra={infra} session={session} onAdd={()=>setModal('infra')} onDelete={deleteInfra}/>}
-          {view==='alert'&&<AlertView session={session} myHouse={myHouse} addIncident={addIncident}/>}
+          {view==='infra'&&<InfraView infra={infra} session={session} onAdd={()=>setModal({type:'infra',item:null})} onEdit={item=>setModal({type:'infra',item})} onDelete={deleteInfra}/>}
+          {view==='alert'&&<AlertView session={session} myHouse={myHouse} addIncident={addIncident} users={users}/>}
           {view==='incidents'&&<IncidentsView incidents={incidents}/>}
           {view==='profile'&&<ProfileView session={session} persistUser={persistUser}/>}
           {view==='admin_reg'&&session.role==='admin'&&<AdminReg houses={houses} users={users} deleteHouse={deleteHouse}/>}
@@ -574,8 +590,8 @@ function App(){
         </div>
       </div>
 
-      {modal==='house'&&<HouseModal onClose={()=>{setModal(null);setPendingLatLng(null);}} onSave={async d=>{await persistHouse(d);setModal(null);setPendingLatLng(null);}} existing={myHouse} session={session} preLatLng={pendingLatLng}/>}
-      {modal==='infra'&&<InfraModal onClose={()=>setModal(null)} onSave={async d=>{await persistInfra(d);setModal(null);}} session={session}/>}
+      {modal==='house'&&<HouseModal onClose={()=>{setModal(null);setPendingLatLng(null);}} onSave={async d=>{await persistHouse(d);setModal(null);setPendingLatLng(null);}} existing={myHouse} session={session} preLatLng={pendingLatLng} houses={houses}/>}
+      {modal?.type==='infra'&&<InfraModal onClose={()=>{setModal(null);setPendingLatLng(null);}} onSave={async d=>{await persistInfra(d);setModal(null);setPendingLatLng(null);}} session={session} existing={modal.item} preLatLng={pendingLatLng}/>}
     </div>
   );
 }
@@ -584,8 +600,9 @@ function App(){
 function LoginPage({users,onLogin,onNewUser}){
   const [tab,setTab]=useState('login');
   const [u,setU]=useState('');const [p,setP]=useState('');const [err,setErr]=useState('');
+  const [remember,setRemember]=useState(false);
   const [reg,setReg]=useState({username:'',password:'',name:'',phone:''});
-  const doLogin=e=>{e.preventDefault();if(!onLogin(u,p))setErr('Usuario o contraseña incorrectos.');};
+  const doLogin=e=>{e.preventDefault();if(!onLogin(u,p,remember))setErr('Usuario o contraseña incorrectos.');};
   const doReg=e=>{e.preventDefault();if(!reg.username||!reg.password||!reg.name){setErr('Complete los campos obligatorios.');return;}onNewUser(reg);};
   return(
     <div className="login-page">
@@ -604,6 +621,10 @@ function LoginPage({users,onLogin,onNewUser}){
           <form onSubmit={doLogin}>
             <div className="field"><label>Usuario</label><input value={u} onChange={e=>setU(e.target.value)} placeholder="ej: admin" autoComplete="username"/></div>
             <div className="field"><label>Contraseña</label><input type="password" value={p} onChange={e=>setP(e.target.value)} placeholder="••••••••" autoComplete="current-password"/></div>
+            <label style={{display:'flex',alignItems:'center',gap:8,fontSize:'.85rem',color:'var(--txs)',marginBottom:'1rem',cursor:'pointer'}}>
+              <input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} style={{width:'auto'}}/>
+              Recordarme en este dispositivo
+            </label>
             <button className="btn btn-p btn-full" type="submit">Ingresar</button>
             <div className="demo-box"><strong>Accesos de prueba:</strong><br/>admin / admin123 — Coordinador<br/>maria / 1234 · jose / 1234 — Habitante</div>
           </form>
@@ -661,23 +682,31 @@ function Dashboard({houses,session,myHouse,nav,emergency,incidents,infra}){
 function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,onMapClick}){
   const [tab,setTab]=useState('fincas');
   const [showInfra,setShowInfra]=useState(true);
-  const [clickMode,setClickMode]=useState(false);
+  const [clickMode,setClickMode]=useState(null); // null | 'house' | 'infra'
 
   const handleMapClick=useCallback(ll=>{
     if(!clickMode) return;
-    onMapClick(ll);
-    setClickMode(false);
+    onMapClick(ll, clickMode);
+    setClickMode(null);
   },[clickMode,onMapClick]);
+
+  const modeLabels={
+    house:{btn:'📍 '+(myHouse?'Mover mi finca':'Ubicar mi finca'), hint:'Toque el punto exacto de su finca', sub:'El formulario se abrirá con las coordenadas listas.'},
+    infra:{btn:'📹 Ubicar dispositivo en mapa', hint:'Toque la ubicación del dispositivo', sub:'El formulario se abrirá con las coordenadas listas.'},
+  };
 
   return(<>
     <div style={{marginBottom:'.75rem',display:'flex',gap:'.5rem',flexWrap:'wrap',justifyContent:'space-between',alignItems:'center'}}>
       <p style={{fontSize:'.83rem',color:'var(--txm)'}}>Sango Parte Alta — Guarne, Antioquia</p>
-      <div style={{display:'flex',gap:6}}>
-        {!clickMode
-          ? <button className="btn btn-p btn-sm" onClick={()=>setClickMode(true)}>📍 {myHouse?'Mover mi finca':'Ubicar mi finca'}</button>
-          : <button className="btn btn-d btn-sm" onClick={()=>setClickMode(false)}>✕ Cancelar</button>
+      <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+        {clickMode
+          ? <button className="btn btn-d btn-sm" onClick={()=>setClickMode(null)}>✕ Cancelar</button>
+          : <>
+              <button className="btn btn-p btn-sm" onClick={()=>setClickMode('house')}>📍 {myHouse?'Mover finca':'Ubicar finca'}</button>
+              <button className="btn btn-s btn-sm" onClick={()=>setClickMode('infra')}>📹 Ubicar dispositivo</button>
+              <button className="btn btn-s btn-sm" onClick={onRegisterInfra}>➕ Agregar dispositivo</button>
+            </>
         }
-        <button className="btn btn-s btn-sm" onClick={onRegisterInfra}>📹 Infraestructura</button>
       </div>
     </div>
 
@@ -685,8 +714,8 @@ function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,o
       <div className="banner info" style={{marginBottom:'.75rem'}}>
         <span className="ico">👆</span>
         <div className="txt">
-          <p>Toque el punto exacto de su finca en el mapa</p>
-          <span>El cursor cambia a una cruz. Toque el mapa donde está su propiedad y se abrirá el formulario con las coordenadas ya llenadas.</span>
+          <p>{modeLabels[clickMode].hint}</p>
+          <span>{modeLabels[clickMode].sub}</span>
         </div>
       </div>
     )}
@@ -694,16 +723,11 @@ function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,o
     <div style={{marginBottom:'.6rem',display:'flex',alignItems:'center',gap:10}}>
       <label style={{fontSize:'.78rem',color:'var(--txs)',display:'flex',alignItems:'center',gap:5,cursor:'pointer'}}>
         <input type="checkbox" checked={showInfra} onChange={e=>setShowInfra(e.target.checked)}/>
-        Mostrar cámaras / alarmas en el mapa
+        Mostrar infraestructura en el mapa
       </label>
     </div>
 
-    <GMap houses={houses} infra={infra} showInfra={showInfra} onMapClick={handleMapClick} clickable={clickMode}/>
-
-    <div className="banner info" style={{marginBottom:'.75rem'}}>
-      <span className="ico">💡</span>
-      <div className="txt"><p>¿No tiene coordenadas GPS?</p><span>Use el botón "📍 Ubicar mi finca" y toque el mapa, o ingrese las coordenadas manualmente en el formulario (Google Maps → mantener presionado sobre su finca).</span></div>
-    </div>
+    <GMap houses={houses} infra={infra} showInfra={showInfra} onMapClick={handleMapClick} clickable={!!clickMode}/>
 
     <div className="map-tabs">
       {['fincas','infra'].map(t=><button key={t} className={`map-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>{t==='fincas'?`🏡 Fincas (${houses.length})`:`📹 Infraestructura (${infra.length})`}</button>)}
@@ -745,9 +769,9 @@ function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,o
 }
 
 /* ══ INFRA VIEW ══ */
-function InfraView({infra,session,onAdd,onDelete}){
+function InfraView({infra,session,onAdd,onEdit,onDelete}){
   return(<>
-    <p style={{fontSize:'.83rem',color:'var(--txm)',marginBottom:'.9rem'}}>Registro de cámaras, alarmas y otros dispositivos de seguridad en la vereda.</p>
+    <p style={{fontSize:'.83rem',color:'var(--txm)',marginBottom:'.9rem'}}>Cámaras, alarmas y dispositivos de seguridad de la vereda. Toque un elemento para editarlo.</p>
     <button className="btn btn-p" style={{marginBottom:'1rem'}} onClick={onAdd}><I.plus/>Agregar dispositivo</button>
     {infra.length===0&&<div className="empty"><div className="big">📹</div><p>No hay infraestructura registrada</p></div>}
     {infra.map(item=>{
@@ -768,7 +792,10 @@ function InfraView({infra,session,onAdd,onDelete}){
             <div style={{marginTop:6,display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
               {item.phone&&<a href={`tel:${item.phone}`} className="pchip">📞 {item.phone}</a>}
               {item.lat&&item.lng&&<a href={`https://www.google.com/maps?q=${item.lat},${item.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver en mapa</a>}
-              <button className="btn btn-d btn-sm" style={{marginLeft:'auto'}} onClick={()=>{if(confirm('¿Eliminar este dispositivo?'))onDelete(item.id);}}>🗑️</button>
+              <div style={{marginLeft:'auto',display:'flex',gap:5}}>
+                <button className="btn-sm" onClick={()=>onEdit(item)}>✏️ Editar</button>
+                <button className="btn btn-d btn-sm" onClick={()=>{if(confirm('¿Eliminar este dispositivo?'))onDelete(item.id);}}>🗑️</button>
+              </div>
             </div>
           </div>
         </div>
@@ -778,13 +805,34 @@ function InfraView({infra,session,onAdd,onDelete}){
 }
 
 /* ══ INFRA MODAL ══ */
-function InfraModal({onClose,onSave,session}){
-  const [form,setForm]=useState({name:'',type:'camara',status:'activo',responsible:session.name,phone:session.phone||'',lat:'',lng:'',description:''});
+function InfraModal({onClose,onSave,session,existing,preLatLng}){
+  const [form,setForm]=useState({
+    name:existing?.name||'',
+    type:existing?.type||'camara',
+    status:existing?.status||'activo',
+    responsible:existing?.responsible||session.name,
+    phone:existing?.phone||session.phone||'',
+    lat:preLatLng?.lat||existing?.lat||'',
+    lng:preLatLng?.lng||existing?.lng||'',
+    description:existing?.description||'',
+  });
   const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
-  const save=()=>{ if(!form.name)return; onSave({...form,id:'infra'+Date.now(),addedBy:session.id,registeredAt:new Date().toISOString().slice(0,10)}); };
+  const isEdit=!!existing;
+  const save=()=>{
+    if(!form.name)return;
+    onSave({
+      ...form,
+      id:existing?.id||('infra'+Date.now()),
+      addedBy:existing?.addedBy||session.id,
+      registeredAt:existing?.registeredAt||new Date().toISOString().slice(0,10),
+    });
+  };
   return(
     <div className="modal-ov"><div className="modal">
-      <div className="modal-hdr"><h3>Registrar infraestructura de seguridad</h3><button className="btn-x" onClick={onClose}>×</button></div>
+      <div className="modal-hdr">
+        <h3>{isEdit?`✏️ Editar: ${existing.name}`:'Registrar infraestructura de seguridad'}</h3>
+        <button className="btn-x" onClick={onClose}>×</button>
+      </div>
       <div className="modal-body">
         <div className="field"><label>Nombre / descripción *</label><input value={form.name} onChange={set('name')} placeholder="Cámara entrada principal"/></div>
         <div className="form-row">
@@ -805,17 +853,24 @@ function InfraModal({onClose,onSave,session}){
           <div className="field"><label>Teléfono contacto</label><input value={form.phone} onChange={set('phone')} placeholder="310..." inputMode="tel"/></div>
         </div>
         <div style={{background:'var(--g0)',border:'1px solid var(--g2)',borderRadius:'var(--r8)',padding:'.7rem',marginBottom:'.9rem'}}>
-          <p style={{fontSize:'.78rem',fontWeight:500,color:'var(--g7)',marginBottom:'.4rem'}}>📍 Coordenadas GPS</p>
-          <p style={{fontSize:'.72rem',color:'var(--txm)',marginBottom:'.5rem',lineHeight:1.5}}>Google Maps → mantenga presionado sobre la ubicación del dispositivo → copie los números.</p>
+          <p style={{fontSize:'.78rem',fontWeight:500,color:'var(--g7)',marginBottom:'.35rem'}}>
+            📍 Coordenadas GPS {preLatLng&&<span className="badge green" style={{marginLeft:6}}>✅ Capturadas del mapa</span>}
+          </p>
+          <p style={{fontSize:'.72rem',color:'var(--txm)',marginBottom:'.5rem',lineHeight:1.5}}>
+            {preLatLng?'Las coordenadas se capturaron del toque en el mapa. Puede ajustarlas si es necesario.':'Use el botón "📹 Ubicar dispositivo" en el mapa para tocar la ubicación, o ingréselas manualmente.'}
+          </p>
           <div className="form-row">
             <div className="field" style={{marginBottom:0}}><label>Latitud</label><input value={form.lat} onChange={set('lat')} placeholder="6.2948" inputMode="decimal"/></div>
             <div className="field" style={{marginBottom:0}}><label>Longitud</label><input value={form.lng} onChange={set('lng')} placeholder="-75.4599" inputMode="decimal"/></div>
           </div>
           {form.lat&&form.lng&&<a href={`https://www.google.com/maps?q=${form.lat},${form.lng}`} target="_blank" rel="noopener noreferrer" style={{display:'inline-block',marginTop:'.45rem',fontSize:'.75rem',color:'var(--sky)',textDecoration:'underline'}}>🗺️ Verificar en Google Maps</a>}
         </div>
-        <div className="field"><label>Notas adicionales</label><textarea value={form.description} onChange={set('description')} placeholder="Cubre el portón, grabación 24h, cámara domo..." rows={2}/></div>
+        <div className="field"><label>Notas adicionales</label><textarea value={form.description} onChange={set('description')} placeholder="Cubre el portón, grabación 24h..." rows={2}/></div>
       </div>
-      <div className="modal-ftr"><button className="btn btn-s" onClick={onClose}>Cancelar</button><button className="btn btn-p" onClick={save}>💾 Guardar</button></div>
+      <div className="modal-ftr">
+        <button className="btn btn-s" onClick={onClose}>Cancelar</button>
+        <button className="btn btn-p" onClick={save}>{isEdit?'💾 Guardar cambios':'💾 Registrar'}</button>
+      </div>
     </div></div>
   );
 }
@@ -944,32 +999,70 @@ function SearchView({searchQ,setSearchQ,searchR,setSearchR,houses,infra,nav}){
 }
 
 /* ══ ALERT VIEW ══ */
-function AlertView({session,myHouse,addIncident}){
+function AlertView({session,myHouse,addIncident,users}){
   const [level,setLevel]=useState('amber');
   const [desc,setDesc]=useState('');
-  const [sent,setSent]=useState(false);
-  const sendAlert=async()=>{
-    const msg=buildWAMsg(level,desc,session,myHouse);
-    window.open(`https://wa.me/${WA_COORDINATOR}?text=${encodeURIComponent(msg)}`,'_blank');
-    await addIncident({level,desc,reporter:session.name,finca:myHouse?.name||'Sin registrar',phone:session.phone||'—'});
-    setSent(true); setDesc(''); setTimeout(()=>setSent(false),4000);
+  const [sent,setSent]=useState([]);
+  const [copied,setCopied]=useState(false);
+
+  const admins=users.filter(u=>u.role==='admin'&&u.phone);
+  const msg=buildWAMsg(level,desc||'(descripción pendiente)',session,myHouse);
+
+  const sendTo=async(admin)=>{
+    const waNum='57'+admin.phone.replace(/\D/g,'').replace(/^57/,'');
+    window.open(`https://wa.me/${waNum}?text=${encodeURIComponent(buildWAMsg(level,desc,session,myHouse))}`,'_blank');
+    if(!sent.includes(admin.id)){
+      setSent(p=>[...p,admin.id]);
+      await addIncident({level,desc,reporter:session.name,finca:myHouse?.name||'Sin registrar',phone:session.phone||'—',sentTo:admin.name});
+    }
   };
+
+  const copyMsg=()=>{
+    navigator.clipboard?.writeText(buildWAMsg(level,desc,session,myHouse)).then(()=>{
+      setCopied(true); setTimeout(()=>setCopied(false),3000);
+    });
+  };
+
   const descs={green:'Persona o vehículo desconocido rondando la zona.',amber:'Robo, hurto o situación de riesgo moderado.',red:'Violencia, secuestro o emergencia inmediata.'};
+
   return(<>
-    <div className="banner err"><span className="ico">🚨</span><div className="txt"><p>Módulo de alerta al frente</p><span>Seleccione el nivel, describa brevemente y toque "Enviar por WhatsApp". Se abrirá WhatsApp con el mensaje listo para enviar.</span></div></div>
+    <div className="banner err"><span className="ico">🚨</span><div className="txt"><p>Módulo de alerta al frente</p><span>Seleccione el nivel, describa el evento y envíe a los coordinadores.</span></div></div>
     <div className="alert-panel">
       <div className="alert-levels">
         {['green','amber','red'].map(l=><button key={l} className={`al-btn ${level===l?'sel':''} ${l}`} onClick={()=>setLevel(l)}>{l==='green'?'🟢 Sospechoso':l==='amber'?'🟡 Alerta':'🔴 Emergencia'}</button>)}
       </div>
       <div className="al-body">
         <p style={{fontSize:'.82rem',color:'var(--txm)',marginBottom:'.8rem'}}>{descs[level]}</p>
-        <div className="field"><label>Descripción del evento</label><textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Describa qué está ocurriendo, características de personas o vehículos..." rows={4}/></div>
+        <div className="field"><label>Descripción del evento</label><textarea value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Describa qué está ocurriendo, características de personas o vehículos..." rows={3}/></div>
+
+        {/* Vista previa */}
         <div style={{background:'var(--bg)',borderRadius:'var(--r8)',padding:'.75rem',marginBottom:'1rem'}}>
           <p style={{fontWeight:500,color:'var(--txs)',marginBottom:4,fontSize:'.78rem'}}>Vista previa del mensaje:</p>
-          <pre style={{whiteSpace:'pre-wrap',fontFamily:'DM Sans,sans-serif',fontSize:'.73rem',lineHeight:1.5,color:'var(--txs)'}}>{buildWAMsg(level,desc||'(descripción pendiente)',session,myHouse)}</pre>
+          <pre style={{whiteSpace:'pre-wrap',fontFamily:'DM Sans,sans-serif',fontSize:'.73rem',lineHeight:1.5,color:'var(--txs)'}}>{msg}</pre>
         </div>
-        <button className="btn btn-w btn-full" onClick={sendAlert} style={{fontSize:'.95rem',padding:'.8rem'}}><I.wa/> Enviar alerta por WhatsApp</button>
-        {sent&&<div className="banner info" style={{marginTop:'.8rem'}}><span className="ico">✅</span><div className="txt"><p>Alerta registrada. Confirme el envío en WhatsApp.</p></div></div>}
+
+        {/* Botón por coordinador */}
+        <p style={{fontSize:'.75rem',color:'var(--txm)',textTransform:'uppercase',letterSpacing:'.06em',fontWeight:500,marginBottom:'.6rem'}}>Enviar a coordinadores ({admins.length})</p>
+        {admins.length===0&&(
+          <div className="banner warn" style={{marginBottom:'.75rem'}}><span className="ico">⚠️</span><div className="txt"><p>No hay coordinadores con teléfono registrado</p><span>Pida a los coordinadores que completen su teléfono en "Mi perfil".</span></div></div>
+        )}
+        {admins.map(admin=>(
+          <button key={admin.id} className="btn btn-w btn-full" onClick={()=>sendTo(admin)}
+            style={{marginBottom:'.5rem',fontSize:'.88rem',padding:'.75rem',justifyContent:'space-between',opacity:sent.includes(admin.id)?0.7:1}}>
+            <span style={{display:'flex',alignItems:'center',gap:7}}><I.wa/>Enviar a {admin.name}</span>
+            <span style={{fontSize:'.78rem',opacity:.85}}>📞 {admin.phone} {sent.includes(admin.id)&&'✅'}</span>
+          </button>
+        ))}
+
+        {/* Copiar para grupo */}
+        <div className="divider"/>
+        <p style={{fontSize:'.75rem',color:'var(--txm)',marginBottom:'.6rem',lineHeight:1.5}}>
+          ¿Tiene un grupo de WhatsApp del frente? Copie el mensaje y péguelo directamente en el grupo.
+        </p>
+        <button className="btn btn-s btn-full" onClick={copyMsg} style={{padding:'.75rem'}}>
+          {copied?'✅ Mensaje copiado — abra su grupo y pegue':'📋 Copiar mensaje para pegar en el grupo'}
+        </button>
+        {copied&&<div className="banner info" style={{marginTop:'.75rem'}}><span className="ico">📲</span><div className="txt"><p>Abra WhatsApp, entre al grupo del frente y toque "Pegar"</p></div></div>}
       </div>
     </div>
   </>);
@@ -1140,27 +1233,97 @@ function AdminUsers({users,session,persistUser,deleteUser}){
 }
 
 /* ══ HOUSE MODAL ══ */
-function HouseModal({onClose,onSave,existing,session,preLatLng}){
-  const [form,setForm]=useState({name:existing?.name||'',owner:existing?.owner||session.name||'',phones:existing?.phones||[session.phone||''],type:existing?.type||'finca',description:existing?.description||'',lat:preLatLng?.lat||existing?.lat||'',lng:preLatLng?.lng||existing?.lng||''});
+function HouseModal({onClose,onSave,existing,session,preLatLng,houses}){
+  // residents: [{name, phone}]
+  const initResidents = ()=>{
+    if(existing?.residents) return existing.residents;
+    // migrate legacy: build from owner + phones
+    if(existing?.owner) return [{name:existing.owner,phone:existing.phones?.[0]||''},...(existing.phones?.slice(1)||[]).map(p=>({name:'',phone:p}))];
+    return [{name:session.name,phone:session.phone||''}];
+  };
+  const [form,setForm]=useState({
+    name:existing?.name||'',
+    type:existing?.type||'finca',
+    description:existing?.description||'',
+    lat:preLatLng?.lat||existing?.lat||'',
+    lng:preLatLng?.lng||existing?.lng||'',
+    residents:initResidents(),
+  });
+  const [assocMode,setAssocMode]=useState(false); // link session to existing house
   const set=k=>e=>setForm(f=>({...f,[k]:e.target.value}));
-  const setPhone=(i,v)=>setForm(f=>{const phones=[...f.phones];phones[i]=v;return{...f,phones};});
-  const save=()=>{ if(!form.name||!form.owner)return; const id=existing?.id||('h'+Date.now()); onSave({...form,id,phones:form.phones.filter(p=>p.trim()),userId:session.id,registeredAt:existing?.registeredAt||new Date().toISOString().slice(0,10)}); };
+  const setRes=(i,k,v)=>setForm(f=>{ const r=[...f.residents]; r[i]={...r[i],[k]:v}; return{...f,residents:r}; });
+  const addRes=()=>setForm(f=>({...f,residents:[...f.residents,{name:'',phone:''}]}));
+  const delRes=i=>setForm(f=>({...f,residents:f.residents.filter((_,idx)=>idx!==i)}));
+
+  // Build legacy phones array from residents for backward compat
+  const save=()=>{
+    if(!form.name)return;
+    const cleanRes=form.residents.filter(r=>r.name||r.phone);
+    const phones=cleanRes.map(r=>r.phone).filter(Boolean);
+    const owner=cleanRes[0]?.name||session.name;
+    const id=existing?.id||('h'+Date.now());
+    onSave({...form,id,owner,phones,residents:cleanRes,userId:session.id,registeredAt:existing?.registeredAt||new Date().toISOString().slice(0,10)});
+  };
+
+  // Other houses not owned by this user (to associate)
+  const otherHouses=(houses||[]).filter(h=>h.userId!==session.id);
+
   return(
     <div className="modal-ov"><div className="modal">
       <div className="modal-hdr"><h3>{existing?'Editar mi finca':'Registrar finca / casa'}</h3><button className="btn-x" onClick={onClose}>×</button></div>
       <div className="modal-body">
+
+        {/* Associate to existing house option */}
+        {!existing&&otherHouses.length>0&&(
+          <div style={{marginBottom:'1rem'}}>
+            <button className="btn btn-s btn-full" style={{marginBottom:'.5rem'}} onClick={()=>setAssocMode(a=>!a)}>
+              {assocMode?'✕ Cancelar':'👥 Asociarme a una finca ya registrada'}
+            </button>
+            {assocMode&&(
+              <div style={{background:'var(--g0)',border:'1px solid var(--g2)',borderRadius:'var(--r8)',padding:'.75rem'}}>
+                <p style={{fontSize:'.78rem',color:'var(--g7)',fontWeight:500,marginBottom:'.5rem'}}>Seleccione la finca a la que pertenece:</p>
+                {otherHouses.map(h=>(
+                  <div key={h.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'.6rem .75rem',background:'var(--surf)',borderRadius:6,marginBottom:5,border:'1px solid var(--bdr)'}}>
+                    <div>
+                      <p style={{fontWeight:500,fontSize:'.85rem'}}>{h.name}</p>
+                      <p style={{fontSize:'.75rem',color:'var(--txm)'}}>{h.owner}</p>
+                    </div>
+                    <button className="btn btn-p btn-sm" onClick={()=>{
+                      // Associate: add this user as resident of existing house
+                      const newRes=[...(h.residents||[{name:h.owner,phone:h.phones?.[0]||''}]),{name:session.name,phone:session.phone||''}];
+                      const phones=newRes.map(r=>r.phone).filter(Boolean);
+                      onSave({...h,residents:newRes,phones,userId:h.userId}); // keep original owner's userId
+                    }}>Unirme</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="form-row">
           <div className="field"><label>Nombre *</label><input value={form.name} onChange={set('name')} placeholder="Finca La Montaña"/></div>
           <div className="field"><label>Tipo</label><select value={form.type} onChange={set('type')}>{['finca','parcela','casa','lote'].map(t=><option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>)}</select></div>
         </div>
-        <div className="field"><label>Responsable *</label><input value={form.owner} onChange={set('owner')} placeholder="Juan Pérez"/></div>
+
+        {/* Multiple residents */}
         <div className="field">
-          <label>Teléfonos</label>
-          {form.phones.map((p,i)=>(
-            <div key={i} className="phone-row"><input value={p} onChange={e=>setPhone(i,e.target.value)} placeholder={`Teléfono ${i+1}`} inputMode="tel"/>{form.phones.length>1&&<button className="del-btn" onClick={()=>setForm(f=>({...f,phones:f.phones.filter((_,idx)=>idx!==i)}))}>×</button>}</div>
+          <label>Personas responsables / habitantes</label>
+          {form.residents.map((r,i)=>(
+            <div key={i} style={{background:'var(--bg)',borderRadius:6,padding:'.6rem .75rem',marginBottom:'.4rem',border:'1px solid var(--bdr)'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5}}>
+                <span className="badge gray">Persona {i+1}{i===0?' (principal)':''}</span>
+                {form.residents.length>1&&<button className="del-btn" style={{height:26,fontSize:'.85rem'}} onClick={()=>delRes(i)}>×</button>}
+              </div>
+              <div className="form-row">
+                <div className="field" style={{marginBottom:0}}><label>Nombre</label><input value={r.name} onChange={e=>setRes(i,'name',e.target.value)} placeholder="Juan Pérez"/></div>
+                <div className="field" style={{marginBottom:0}}><label>Teléfono WhatsApp</label><input value={r.phone} onChange={e=>setRes(i,'phone',e.target.value)} placeholder="310..." inputMode="tel"/></div>
+              </div>
+            </div>
           ))}
-          <button className="btn-add" onClick={()=>setForm(f=>({...f,phones:[...f.phones,'']}))}>+ Agregar teléfono</button>
+          <button className="btn-add" onClick={addRes}>+ Agregar otra persona</button>
         </div>
+
         <div style={{background:'var(--g0)',border:'1px solid var(--g2)',borderRadius:'var(--r8)',padding:'.7rem',marginBottom:'.9rem'}}>
           <p style={{fontSize:'.78rem',fontWeight:500,color:'var(--g7)',marginBottom:'.35rem'}}>📍 Coordenadas GPS</p>
           <p style={{fontSize:'.72rem',color:'var(--txm)',marginBottom:'.5rem',lineHeight:1.5}}>Google Maps → mantenga presionado sobre su finca → copie los números que aparecen.</p>
