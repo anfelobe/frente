@@ -499,8 +499,22 @@ function App(){
   const nav=v=>{ setView(v); setSbOpen(false); };
   const initials=n=>n.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 
-  const persistHouse=async d=>{ setHouses(p=>{const ex=p.find(h=>h.userId===session.id); return ex?p.map(h=>h.userId===session.id?{...h,...d}:h):[...p,d];}); if(fbOk) await fbSet('sango_houses',d.id,d); };
-  const persistUser=async u=>{ setUsers(p=>p.map(x=>x.id===u.id?u:x)); if(session.id===u.id) setSession(u); if(fbOk) await fbSet('sango_users',u.id,u); };
+  // isGuest must be derived before any hooks that use it
+  const isGuest = session?.role==='guest';
+
+  // Redirect guest if they land on a restricted view — MUST be before early return
+  useEffect(()=>{
+    if(isGuest&&!['map','emergency','protocol'].includes(view)) setView('map');
+  },[isGuest,view]);
+
+  const persistHouse=async d=>{
+    setHouses(p=>{
+      const ex=p.find(h=>h.userId===session?.id);
+      return ex?p.map(h=>h.userId===session?.id?{...h,...d}:h):[...p,d];
+    });
+    if(fbOk) await fbSet('sango_houses',d.id,d);
+  };
+  const persistUser=async u=>{ setUsers(p=>p.map(x=>x.id===u.id?u:x)); if(session?.id===u.id) setSession(u); if(fbOk) await fbSet('sango_users',u.id,u); };
   const persistEmergency=async list=>{ setEmergency(list); if(fbOk) for(const e of list) await fbSet('sango_emergency',e.id,e); };
   const persistProtocol=async list=>{ setProtocols(list); if(fbOk) for(const p of list) await fbSet('sango_protocols',p.id,p); };
   const deleteHouse=async id=>{ setHouses(p=>p.filter(h=>h.id!==id)); if(fbOk) await fbDel('sango_houses',id); };
@@ -508,7 +522,6 @@ function App(){
   const persistInfra=async item=>{ setInfra(p=>{const ex=p.find(x=>x.id===item.id); return ex?p.map(x=>x.id===item.id?item:x):[...p,item];}); if(fbOk) await fbSet('sango_infra',item.id,item); };
   const deleteInfra=async id=>{ setInfra(p=>p.filter(x=>x.id!==id)); if(fbOk) await fbDel('sango_infra',id); };
   const addIncident=async inc=>{ const full={...inc,id:'i'+Date.now(),createdAt:new Date().toLocaleString('es-CO')}; setIncidents(p=>[full,...p]); if(fbOk) await fbSet('sango_incidents',full.id,full); };
-
   const logout=()=>{ localStorage.removeItem('s_session'); setSession(null); };
 
   if(!session) return(
@@ -530,10 +543,8 @@ function App(){
   );
 
   const myHouse=houses.find(h=>h.userId===session.id);
-  const isGuest = session.role==='guest';
   const TITLES={dashboard:'Inicio',map:'Mapa del frente',emergency:'Emergencias',protocol:'Protocolo de seguridad',search:'Buscar finca / persona',alert:'Enviar alerta',incidents:'Historial de alertas',infra:'Infraestructura de seguridad',profile:'Mi perfil',admin_reg:'Registro de fincas',admin_em:'Editar emergencias',admin_proto:'Editar protocolos',admin_users:'Gestionar usuarios'};
 
-  // Guest only sees these 3 views
   const GUEST_NAV=[
     {id:'map',label:'Mapa del frente',Icon:I.map},
     {id:'emergency',label:'Emergencias',Icon:I.phone},
@@ -556,11 +567,6 @@ function App(){
     {id:'admin_proto',label:'Editar protocolos',Icon:I.edit},
     {id:'admin_users',label:'Gestionar usuarios',Icon:I.users},
   ];
-
-  // Redirect guest if they land on restricted view
-  useEffect(()=>{
-    if(isGuest&&!['map','emergency','protocol'].includes(view)) setView('map');
-  },[isGuest,view]);
 
   return(
     <div className="app">
@@ -1705,50 +1711,133 @@ function AdminProtocol({protocols,persist}){
 function AdminUsers({users,session,persistUser,deleteUser}){
   const [confirm,setConfirm]=useState(null);
   const [showPwd,setShowPwd]=useState({});
+  const [showDupes,setShowDupes]=useState(true);
+  const [mergingGroup,setMergingGroup]=useState(null); // array of duplicate users
+  const [keepId,setKeepId]=useState(null);
+
   const cu=confirm?users.find(u=>u.id===confirm.id):null;
-  const doConfirm=async()=>{ if(confirm.action==='promote')await persistUser({...cu,role:'admin'}); else if(confirm.action==='demote')await persistUser({...cu,role:'user'}); else if(confirm.action==='delete')await deleteUser(cu.id); setConfirm(null); };
-  const msgs={promote:`¿Designar a "${cu?.name}" como coordinador?`,demote:`¿Quitar permisos de coordinador a "${cu?.name}"?`,delete:`¿Eliminar a "${cu?.name}"? No se puede deshacer.`};
+  const doConfirm=async()=>{
+    if(confirm.action==='promote') await persistUser({...cu,role:'admin'});
+    else if(confirm.action==='demote') await persistUser({...cu,role:'user'});
+    else if(confirm.action==='delete') await deleteUser(cu.id);
+    setConfirm(null);
+  };
+  const msgs={
+    promote:`¿Designar a "${cu?.name}" como coordinador?`,
+    demote:`¿Quitar permisos de coordinador a "${cu?.name}"?`,
+    delete:`¿Eliminar a "${cu?.name}"? No se puede deshacer.`,
+  };
   const togglePwd=id=>setShowPwd(p=>({...p,[id]:!p[id]}));
+
+  // ── Detect duplicates ──
+  // Group by normalized name (lowercase, trim)
+  const groups = {};
+  users.forEach(u=>{
+    const key = u.name.trim().toLowerCase();
+    if(!groups[key]) groups[key]=[];
+    groups[key].push(u);
+  });
+  const dupeGroups = Object.values(groups).filter(g=>g.length>1);
+  const dupeIds = new Set(dupeGroups.flat().map(u=>u.id));
+
+  // ── Merge: keep one, delete the rest ──
+  const doMerge=async()=>{
+    if(!keepId||!mergingGroup) return;
+    const toDelete = mergingGroup.filter(u=>u.id!==keepId);
+    for(const u of toDelete) await deleteUser(u.id);
+    setMergingGroup(null);
+    setKeepId(null);
+  };
+
   return(<>
-    <div className="banner info" style={{marginBottom:'1rem'}}><span className="ico">🔑</span><div className="txt"><p>Gestión de roles y accesos</p><span>Puede haber varios coordinadores — uno por sector de la vereda.</span></div></div>
+    <div className="banner info" style={{marginBottom:'1rem'}}>
+      <span className="ico">🔑</span>
+      <div className="txt"><p>Gestión de roles y accesos</p><span>Puede haber varios coordinadores — uno por sector de la vereda.</span></div>
+    </div>
     <div className="banner warn" style={{marginBottom:'1rem'}}>
       <span className="ico">👁️</span>
-      <div className="txt"><p>Contraseñas visibles para soporte</p><span>Si un vecino olvidó su contraseña, toque el ícono 👁️ en su fila para verla y comunicársela. Mantenga esta información con discreción.</span></div>
+      <div className="txt"><p>Contraseñas visibles para soporte</p><span>Si un vecino olvidó su contraseña, toque 👁️ para verla y comunicársela. Mantenga esta información con discreción.</span></div>
     </div>
-    <div className="card"><div className="card-hdr"><h3>Usuarios ({users.length})</h3><span className="badge amber">{users.filter(u=>u.role==='admin').length} coordinador(es)</span></div>
-    <div className="tbl-wrap"><table>
-      <thead><tr><th>Nombre</th><th>Usuario</th><th>Contraseña</th><th>Teléfono</th><th>Rol</th><th>Acciones</th></tr></thead>
-      <tbody>{users.map(u=>(
-        <tr key={u.id}>
-          <td><div style={{display:'flex',alignItems:'center',gap:7}}>
-            <div style={{width:26,height:26,background:u.role==='admin'?'var(--amb0)':'var(--g1)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'.7rem',fontWeight:600,color:u.role==='admin'?'var(--amb)':'var(--g7)',flexShrink:0}}>{u.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</div>
-            <span style={{fontWeight:500}}>{u.name}</span>{u.id===session.id&&<span className="badge sky" style={{fontSize:'.63rem'}}>yo</span>}
-          </div></td>
-          <td style={{color:'var(--txm)',fontSize:'.8rem'}}>{u.username}</td>
-          <td>
-            <div style={{display:'flex',alignItems:'center',gap:5}}>
-              <span style={{fontFamily:'monospace',fontSize:'.8rem',color:'var(--txs)',letterSpacing:showPwd[u.id]?'.05em':'.12em'}}>
-                {showPwd[u.id] ? u.password : '•'.repeat(Math.min(u.password?.length||6,8))}
-              </span>
-              <button
-                className="btn-sm"
-                title={showPwd[u.id]?'Ocultar':'Ver contraseña'}
-                onClick={()=>togglePwd(u.id)}
-                style={{padding:'2px 6px',fontSize:'.8rem'}}
-              >{showPwd[u.id]?'🙈':'👁️'}</button>
+
+    {/* ── Duplicates section ── */}
+    {dupeGroups.length>0&&(
+      <div className="card" style={{marginBottom:'1rem',border:'1px solid #f7c1c1'}}>
+        <div className="card-hdr" style={{background:'var(--red0)',cursor:'pointer'}} onClick={()=>setShowDupes(s=>!s)}>
+          <h3 style={{color:'var(--red)'}}>🔁 Usuarios duplicados detectados ({dupeGroups.length} grupo(s))</h3>
+          <span className="badge red">{showDupes?'▲ Ocultar':'▼ Ver'}</span>
+        </div>
+        {showDupes&&<div className="card-body">
+          <p style={{fontSize:'.78rem',color:'var(--txm)',marginBottom:'.75rem',lineHeight:1.5}}>
+            Los siguientes usuarios tienen el mismo nombre. Probablemente se registraron varias veces. Elija cuál conservar y los demás se eliminarán.
+          </p>
+          {dupeGroups.map((group,gi)=>(
+            <div key={gi} style={{background:'var(--bg)',borderRadius:6,padding:'.7rem',marginBottom:'.6rem',border:'1px solid var(--bdr)'}}>
+              <p style={{fontWeight:500,fontSize:'.83rem',marginBottom:'.5rem',color:'var(--red)'}}>
+                ⚠️ {group.length} registros con nombre "{group[0].name}"
+              </p>
+              {group.map(u=>(
+                <div key={u.id} style={{display:'flex',alignItems:'center',gap:8,padding:'.5rem .65rem',background:'var(--surf)',borderRadius:5,marginBottom:4,border:`1.5px solid ${keepId===u.id&&mergingGroup===group?'var(--g4)':'var(--bdr)'}`,cursor:'pointer'}} onClick={()=>{setMergingGroup(group);setKeepId(u.id);}}>
+                  <input type="radio" name={`merge-${gi}`} checked={keepId===u.id&&mergingGroup===group} onChange={()=>{setMergingGroup(group);setKeepId(u.id);}} style={{width:'auto',flexShrink:0}}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <p style={{fontWeight:500,fontSize:'.83rem'}}>{u.name}</p>
+                    <p style={{fontSize:'.73rem',color:'var(--txm)'}}>@{u.username} · {u.phone||'sin teléfono'} · <span className={`badge ${u.role==='admin'?'amber':'green'}`} style={{fontSize:'.63rem'}}>{u.role==='admin'?'Coordinador':'Habitante'}</span></p>
+                  </div>
+                  {u.id===session.id&&<span className="badge sky" style={{fontSize:'.63rem'}}>yo</span>}
+                </div>
+              ))}
+              {mergingGroup===group&&keepId&&(
+                <div style={{marginTop:'.6rem',display:'flex',gap:6,alignItems:'center'}}>
+                  <p style={{fontSize:'.78rem',color:'var(--g7)',flex:1}}>
+                    ✅ Se conservará <strong>{group.find(u=>u.id===keepId)?.name}</strong> (@{group.find(u=>u.id===keepId)?.username}) y se eliminarán {group.length-1} registro(s).
+                  </p>
+                  <button className="btn btn-d btn-sm" onClick={doMerge}>🗑️ Eliminar duplicados</button>
+                  <button className="btn-sm" onClick={()=>{setMergingGroup(null);setKeepId(null);}}>Cancelar</button>
+                </div>
+              )}
             </div>
-          </td>
-          <td>{u.phone?<a href={`tel:${u.phone}`} className="pchip">📞 {u.phone}</a>:'—'}</td>
-          <td><span className={`badge ${u.role==='admin'?'amber':'green'}`}>{u.role==='admin'?'⭐ Coordinador':'Habitante'}</span></td>
-          <td>{u.id!==session.id?(
-            <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-              {u.role==='user'?<button className="btn-sm" style={{background:'var(--amb0)',color:'var(--amb)',borderColor:'#fac775'}} onClick={()=>setConfirm({id:u.id,action:'promote'})}>⭐</button>:<button className="btn-sm" onClick={()=>setConfirm({id:u.id,action:'demote'})}>↓</button>}
-              <button className="btn-sm" style={{color:'var(--red)',borderColor:'#f7c1c1'}} onClick={()=>setConfirm({id:u.id,action:'delete'})}>🗑️</button>
-            </div>
-          ):<span style={{fontSize:'.72rem',color:'var(--txm)',fontStyle:'italic'}}>Mi cuenta</span>}</td>
-        </tr>
-      ))}</tbody>
-    </table></div></div>
+          ))}
+        </div>}
+      </div>
+    )}
+
+    {/* ── Users table ── */}
+    <div className="card">
+      <div className="card-hdr">
+        <h3>Usuarios ({users.length})</h3>
+        <span className="badge amber">{users.filter(u=>u.role==='admin').length} coordinador(es)</span>
+      </div>
+      <div className="tbl-wrap"><table>
+        <thead><tr><th>Nombre</th><th>Usuario</th><th>Contraseña</th><th>Teléfono</th><th>Rol</th><th>Acciones</th></tr></thead>
+        <tbody>{users.map(u=>(
+          <tr key={u.id} style={{background:dupeIds.has(u.id)?'#fff8f0':''}}>
+            <td><div style={{display:'flex',alignItems:'center',gap:7}}>
+              <div style={{width:26,height:26,background:u.role==='admin'?'var(--amb0)':'var(--g1)',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'.7rem',fontWeight:600,color:u.role==='admin'?'var(--amb)':'var(--g7)',flexShrink:0}}>{u.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}</div>
+              <span style={{fontWeight:500}}>{u.name}</span>
+              {u.id===session.id&&<span className="badge sky" style={{fontSize:'.63rem'}}>yo</span>}
+              {dupeIds.has(u.id)&&<span className="badge red" style={{fontSize:'.6rem'}}>duplicado</span>}
+            </div></td>
+            <td style={{color:'var(--txm)',fontSize:'.8rem'}}>{u.username}</td>
+            <td>
+              <div style={{display:'flex',alignItems:'center',gap:5}}>
+                <span style={{fontFamily:'monospace',fontSize:'.8rem',color:'var(--txs)',letterSpacing:showPwd[u.id]?'.05em':'.12em'}}>
+                  {showPwd[u.id]?u.password:'•'.repeat(Math.min(u.password?.length||6,8))}
+                </span>
+                <button className="btn-sm" title={showPwd[u.id]?'Ocultar':'Ver'} onClick={()=>togglePwd(u.id)} style={{padding:'2px 6px',fontSize:'.8rem'}}>{showPwd[u.id]?'🙈':'👁️'}</button>
+              </div>
+            </td>
+            <td>{u.phone?<a href={`tel:${u.phone}`} className="pchip">📞 {u.phone}</a>:'—'}</td>
+            <td><span className={`badge ${u.role==='admin'?'amber':'green'}`}>{u.role==='admin'?'⭐ Coordinador':'Habitante'}</span></td>
+            <td>{u.id!==session.id?(
+              <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+                {u.role==='user'?<button className="btn-sm" style={{background:'var(--amb0)',color:'var(--amb)',borderColor:'#fac775'}} onClick={()=>setConfirm({id:u.id,action:'promote'})}>⭐</button>:<button className="btn-sm" onClick={()=>setConfirm({id:u.id,action:'demote'})}>↓</button>}
+                <button className="btn-sm" style={{color:'var(--red)',borderColor:'#f7c1c1'}} onClick={()=>setConfirm({id:u.id,action:'delete'})}>🗑️</button>
+              </div>
+            ):<span style={{fontSize:'.72rem',color:'var(--txm)',fontStyle:'italic'}}>Mi cuenta</span>}</td>
+          </tr>
+        ))}</tbody>
+      </table></div>
+    </div>
+
     {confirm&&<div className="modal-ov"><div className="modal" style={{maxWidth:380}}>
       <div className="modal-hdr"><h3>Confirmar acción</h3><button className="btn-x" onClick={()=>setConfirm(null)}>×</button></div>
       <div className="modal-body"><p style={{fontSize:'.88rem',lineHeight:1.6,color:'var(--txs)'}}>{msgs[confirm.action]}</p></div>
