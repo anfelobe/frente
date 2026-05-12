@@ -11,6 +11,8 @@
   import { getFirestore, collection, doc, setDoc, onSnapshot,
            deleteDoc, serverTimestamp, query, orderBy }
                              from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject }
+                             from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
   const firebaseConfig = {
     apiKey:            "AIzaSyA0ntQPmlfl1tiDJlmTYD6rijqABQIFuFs",
     authDomain:        "sango-seguridad-304bb.firebaseapp.com",
@@ -21,7 +23,13 @@
   };
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
+  const storage = getStorage(app);
   window._db = db;
+  window._storage = storage;
+  window._storageRef = ref;
+  window._storageUpload = uploadBytes;
+  window._storageGetUrl = getDownloadURL;
+  window._storageDelete = deleteObject;
   window._fs = { collection, doc, setDoc, onSnapshot, deleteDoc, serverTimestamp, query, orderBy };
   window._firebaseReady = true;
   window.dispatchEvent(new Event('firebase-ready'));
@@ -256,6 +264,16 @@ tr:hover td{background:#fafcfa}
 /* PROFILE */
 .profile-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r12);padding:1.2rem;margin-bottom:.9rem;display:flex;align-items:center;gap:1rem}
 .profile-av{width:56px;height:56px;background:var(--g7);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:1.2rem;color:var(--g2);flex-shrink:0}
+/* PHOTO UPLOAD */
+.photo-zone{border:2px dashed var(--bdr);border-radius:var(--r12);overflow:hidden;position:relative;background:var(--bg);transition:border-color .2s;cursor:pointer}
+.photo-zone:hover{border-color:var(--g4)}
+.photo-zone.has-photo{border-style:solid;border-color:var(--g3)}
+.photo-zone img{width:100%;height:200px;object-fit:cover;display:block}
+.photo-zone .photo-empty{height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--txm);font-size:.83rem}
+.photo-zone .photo-empty span{font-size:2rem}
+.photo-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.photo-actions{display:flex;gap:6px;margin-top:6px}
+.photo-loading{position:absolute;inset:0;background:rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:.85rem;color:var(--g7);font-weight:500}
 </style>
 </head>
 <body>
@@ -274,6 +292,20 @@ const hasMapsKey = ()=> window.MAPS_KEY && window.MAPS_KEY !== '';
 async function fbSet(col,id,data){ await waitFirebase(); const {doc,setDoc,serverTimestamp}=window._fs; await setDoc(doc(window._db,col,String(id)),{...data,_ts:serverTimestamp()}); }
 async function fbDel(col,id){ await waitFirebase(); const {doc,deleteDoc}=window._fs; await deleteDoc(doc(window._db,col,String(id))); }
 function fbListen(col,cb,ord='_ts'){ waitFirebase().then(()=>{ const {collection,onSnapshot,query,orderBy}=window._fs; return onSnapshot(query(collection(window._db,col),orderBy(ord,'asc')),snap=>{ const r=[]; snap.forEach(d=>r.push({_docId:d.id,...d.data()})); cb(r); }); }); }
+
+async function uploadPhoto(file, path){
+  await waitFirebase();
+  const storageRef = window._storageRef(window._storage, path);
+  await window._storageUpload(storageRef, file);
+  return await window._storageGetUrl(storageRef);
+}
+async function deletePhoto(url){
+  try {
+    await waitFirebase();
+    const storageRef = window._storageRef(window._storage, url);
+    await window._storageDelete(storageRef);
+  } catch(e){ /* ignore if not found */ }
+}
 
 const ls=(k,d)=>{ try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;} };
 const lsSet=(k,v)=>{ try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
@@ -457,6 +489,61 @@ function GMap({houses,infra,showInfra,onMapClick,clickable}){
     </div>
   );
   return <div ref={ref} className="map-container"/>;
+}
+
+/* ══════════ PHOTO UPLOAD COMPONENT ══════════ */
+function PhotoUpload({houseId, currentUrl, onUploaded, label='Foto de la finca'}){
+  const [loading,setLoading]=useState(false);
+  const [preview,setPreview]=useState(currentUrl||null);
+  const [err,setErr]=useState('');
+
+  const handleFile=async(e)=>{
+    const file=e.target.files?.[0];
+    if(!file) return;
+    // Validate
+    if(!file.type.startsWith('image/')) { setErr('Solo se permiten imágenes.'); return; }
+    if(file.size>5*1024*1024) { setErr('La imagen no puede superar 5 MB.'); return; }
+    setErr('');
+    // Local preview immediately
+    const localUrl=URL.createObjectURL(file);
+    setPreview(localUrl);
+    setLoading(true);
+    try {
+      const path=`fincas/${houseId}/foto_${Date.now()}.jpg`;
+      const url=await uploadPhoto(file,path);
+      setPreview(url);
+      onUploaded(url);
+    } catch(ex){
+      setErr('Error al subir la foto. Verifique que Firebase Storage esté habilitado.');
+      setPreview(currentUrl||null);
+    } finally { setLoading(false); }
+  };
+
+  const removePhoto=()=>{ setPreview(null); onUploaded(null); };
+
+  return(
+    <div className="field">
+      <label>{label}</label>
+      <div className={`photo-zone ${preview?'has-photo':''}`}>
+        {preview
+          ? <img src={preview} alt="Foto finca"/>
+          : <div className="photo-empty"><span>📷</span><p>Toque para subir una foto</p><p style={{fontSize:'.75rem'}}>JPG, PNG · máx. 5 MB</p></div>
+        }
+        <input type="file" accept="image/*" capture="environment" onChange={handleFile} title="Seleccionar foto"/>
+        {loading&&<div className="photo-loading">⏳ Subiendo foto...</div>}
+      </div>
+      {err&&<p style={{fontSize:'.75rem',color:'var(--red)',marginTop:4}}>{err}</p>}
+      {preview&&!loading&&(
+        <div className="photo-actions">
+          <label className="btn-sm" style={{cursor:'pointer',display:'inline-flex',alignItems:'center',gap:4}}>
+            📷 Cambiar foto
+            <input type="file" accept="image/*" capture="environment" onChange={handleFile} style={{display:'none'}}/>
+          </label>
+          <button className="btn btn-d btn-sm" onClick={removePhoto}>🗑️ Quitar foto</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ══════════ APP ROOT ══════════ */
@@ -822,15 +909,18 @@ function MapView({houses,infra,session,myHouse,onRegisterHouse,onRegisterInfra,o
     </div>
 
     {tab==='fincas'&&houses.map(h=>(
-      <div key={h.id} style={{background:'var(--surf)',border:`1px solid ${h.userId===session.id?'var(--g3)':'var(--bdr)'}`,borderRadius:'var(--r12)',padding:'.8rem',marginBottom:'.48rem'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:7,marginBottom:4,flexWrap:'wrap'}}>
-          <p style={{fontWeight:500,fontSize:'.85rem'}}>{h.name}</p>
-          <div style={{display:'flex',gap:5}}>{h.userId===session.id&&<span className="badge green">Mi finca</span>}<span className="badge gray">{h.type}</span></div>
+      <div key={h.id} style={{background:'var(--surf)',border:`1px solid ${h.userId===session.id?'var(--g3)':'var(--bdr)'}`,borderRadius:'var(--r12)',marginBottom:'.48rem',overflow:'hidden'}}>
+        {h.photoUrl&&<img src={h.photoUrl} alt={h.name} style={{width:'100%',height:160,objectFit:'cover',display:'block'}}/>}
+        <div style={{padding:'.8rem'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:7,marginBottom:4,flexWrap:'wrap'}}>
+            <p style={{fontWeight:500,fontSize:'.85rem'}}>{h.name}</p>
+            <div style={{display:'flex',gap:5}}>{h.userId===session.id&&<span className="badge green">Mi finca</span>}<span className="badge gray">{h.type}</span></div>
+          </div>
+          <p style={{fontSize:'.78rem',color:'var(--txm)',marginBottom:5}}>{h.owner}</p>
+          {h.description&&<p style={{fontSize:'.76rem',color:'var(--txm)',marginBottom:5,fontStyle:'italic'}}>📍 {h.description}</p>}
+          {h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip">📞 {p}</a>)}
+          {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver</a>}
         </div>
-        <p style={{fontSize:'.78rem',color:'var(--txm)',marginBottom:5}}>{h.owner}</p>
-        {h.description&&<p style={{fontSize:'.76rem',color:'var(--txm)',marginBottom:5,fontStyle:'italic'}}>📍 {h.description}</p>}
-        {h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip">📞 {p}</a>)}
-        {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver</a>}
       </div>
     ))}
 
@@ -986,6 +1076,7 @@ function ProfileView({session,persistUser,houses,persistHouse,users}){
   const [hForm,setHForm]=useState({
     name:myHouse?.name||'',type:myHouse?.type||'finca',
     description:myHouse?.description||'',lat:myHouse?.lat||'',lng:myHouse?.lng||'',
+    photoUrl:myHouse?.photoUrl||'',
     residents:initRes(),
   });
   const setH=k=>e=>setHForm(f=>({...f,[k]:e.target.value}));
@@ -1123,6 +1214,12 @@ function ProfileView({session,persistUser,houses,persistHouse,users}){
             </div>
           )}
         </div>
+
+        <PhotoUpload
+          houseId={myHouse?.id||'new_profile'}
+          currentUrl={hForm.photoUrl}
+          onUploaded={url=>setHForm(f=>({...f,photoUrl:url||''}))}
+        />
 
         {/* GPS */}
         <div style={{background:'var(--g0)',border:'1px solid var(--g2)',borderRadius:'var(--r8)',padding:'.65rem',marginBottom:'.9rem'}}>
@@ -1394,8 +1491,17 @@ function AdminReg({houses,users,deleteHouse,persistHouse}){
 
   const uName=id=>{const u=users.find(u=>u.id===id);return u?u.name:'Sin cuenta';};
   const csv=()=>{
-    const rows=['Nombre,Propietario,Tipo,Teléfonos,Lat,Lng,Descripción,Fecha',...houses.map(h=>`"${h.name}","${h.owner}","${h.type}","${h.phones.join('/')}","${h.lat||''}","${h.lng||''}","${h.description||''}","${h.registeredAt||''}"`)].join('\n');
-    const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows);a.download='sango_fincas.csv';a.click();
+    const rows=[
+      'Nombre,Propietario,Tipo,Teléfonos,Latitud,Longitud,Coordenadas Google Maps,Descripción,Foto URL,Fecha',
+      ...houses.map(h=>{
+        const mapsUrl = h.lat&&h.lng ? `https://www.google.com/maps?q=${h.lat},${h.lng}` : '';
+        return `"${h.name}","${h.owner}","${h.type}","${h.phones.join('/')}","${h.lat||''}","${h.lng||''}","${mapsUrl}","${h.description||''}","${h.photoUrl||''}","${h.registeredAt||''}"`;
+      })
+    ].join('\n');
+    const a=document.createElement('a');
+    a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(rows);
+    a.download='sango_fincas.csv';
+    a.click();
   };
 
   /* ── Create ── */
@@ -1432,7 +1538,7 @@ function AdminReg({houses,users,deleteHouse,persistHouse}){
   const openEdit=(h)=>{
     setEditingId(h.id);
     const res=h.residents||(h.owner?[{name:h.owner,phone:h.phones?.[0]||''},...(h.phones?.slice(1)||[]).map(p=>({name:'',phone:p}))]:[{name:'',phone:''}]);
-    setEForm({name:h.name,type:h.type,description:h.description||'',lat:h.lat||'',lng:h.lng||'',residents:res,userId:h.userId||''});
+    setEForm({name:h.name,type:h.type,description:h.description||'',lat:h.lat||'',lng:h.lng||'',photoUrl:h.photoUrl||'',residents:res,userId:h.userId||''});
   };
   const setE=k=>e=>setEForm(f=>({...f,[k]:e.target.value}));
   const setERes=(i,k,v)=>setEForm(f=>{const r=[...f.residents];r[i]={...r[i],[k]:v};return{...f,residents:r};});
@@ -1578,6 +1684,7 @@ function AdminReg({houses,users,deleteHouse,persistHouse}){
           </div>
           {!isEd&&(
             <div className="card-body" style={{paddingTop:'.65rem'}}>
+              {h.photoUrl&&<img src={h.photoUrl} alt={h.name} style={{width:'100%',height:140,objectFit:'cover',borderRadius:6,marginBottom:8,display:'block'}}/>}
               <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:5}}>
                 {h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip">📞 {p}</a>)}
                 {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)'}}>🗺️ Ver mapa</a>}
@@ -1617,6 +1724,11 @@ function AdminReg({houses,users,deleteHouse,persistHouse}){
               </div>
               {eForm.lat&&eForm.lng&&<a href={`https://www.google.com/maps?q=${eForm.lat},${eForm.lng}`} target="_blank" rel="noopener noreferrer" style={{fontSize:'.73rem',color:'var(--sky)',textDecoration:'underline',display:'inline-block',marginBottom:'.6rem'}}>🗺️ Verificar en Google Maps</a>}
               <div className="field"><label>Referencia</label><textarea value={eForm.description} onChange={setE('description')} rows={2}/></div>
+              <PhotoUpload
+                houseId={h.id}
+                currentUrl={eForm.photoUrl||h.photoUrl||''}
+                onUploaded={url=>setEForm(f=>({...f,photoUrl:url||''}))}
+              />
               <button className="btn btn-p btn-full" onClick={()=>saveEdit(h)}>💾 Guardar cambios</button>
             </div>
           )}
@@ -1861,6 +1973,7 @@ function HouseModal({onClose,onSave,existing,session,preLatLng,houses}){
     description:existing?.description||'',
     lat:preLatLng?.lat||existing?.lat||'',
     lng:preLatLng?.lng||existing?.lng||'',
+    photoUrl:existing?.photoUrl||'',
     residents:initResidents(),
   });
   const [assocMode,setAssocMode]=useState(false); // link session to existing house
@@ -1937,6 +2050,12 @@ function HouseModal({onClose,onSave,existing,session,preLatLng,houses}){
           ))}
           <button className="btn-add" onClick={addRes}>+ Agregar otra persona</button>
         </div>
+
+        <PhotoUpload
+          houseId={existing?.id||'new_'+Date.now()}
+          currentUrl={form.photoUrl}
+          onUploaded={url=>setForm(f=>({...f,photoUrl:url||''}))}
+        />
 
         <div style={{background:'var(--g0)',border:'1px solid var(--g2)',borderRadius:'var(--r8)',padding:'.7rem',marginBottom:'.9rem'}}>
           <p style={{fontSize:'.78rem',fontWeight:500,color:'var(--g7)',marginBottom:'.35rem'}}>📍 Coordenadas GPS</p>
