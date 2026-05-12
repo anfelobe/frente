@@ -529,7 +529,7 @@ function PhotoUpload({houseId, currentUrl, onUploaded, label='Foto de la finca'}
           ? <img src={preview} alt="Foto finca"/>
           : <div className="photo-empty"><span>📷</span><p>Toque para subir una foto</p><p style={{fontSize:'.75rem'}}>JPG, PNG · máx. 5 MB</p></div>
         }
-        <input type="file" accept="image/*" capture="environment" onChange={handleFile} title="Seleccionar foto"/>
+        <input type="file" accept="image/*" onChange={handleFile} title="Seleccionar foto"/>
         {loading&&<div className="photo-loading">⏳ Subiendo foto...</div>}
       </div>
       {err&&<p style={{fontSize:'.75rem',color:'var(--red)',marginTop:4}}>{err}</p>}
@@ -537,7 +537,7 @@ function PhotoUpload({houseId, currentUrl, onUploaded, label='Foto de la finca'}
         <div className="photo-actions">
           <label className="btn-sm" style={{cursor:'pointer',display:'inline-flex',alignItems:'center',gap:4}}>
             📷 Cambiar foto
-            <input type="file" accept="image/*" capture="environment" onChange={handleFile} style={{display:'none'}}/>
+            <input type="file" accept="image/*" onChange={handleFile} style={{display:'none'}}/>
           </label>
           <button className="btn btn-d btn-sm" onClick={removePhoto}>🗑️ Quitar foto</button>
         </div>
