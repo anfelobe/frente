@@ -458,7 +458,21 @@ function GMap({houses,infra,showInfra,onMapClick,clickable}){
         icon: emojiIcon('🏡','#1a4a20',36),
       });
       marker.addListener('click',()=>{
-        iw.setContent(`<div style="font-family:sans-serif;padding:4px 6px;min-width:170px"><strong style="font-size:13px">🏡 ${h.name}</strong><p style="font-size:11px;color:#555;margin:3px 0">${h.owner} · ${h.type}</p><p style="font-size:11px;color:#555;margin:2px 0">${h.description||''}</p>${h.phones.map(p=>`<a href="tel:${p}" style="font-size:12px;color:#185fa5;display:block;margin-top:4px">📞 ${p}</a>`).join('')}</div>`);
+        const photoHtml = h.photoUrl
+          ? `<img src="${h.photoUrl}" alt="${h.name}" style="width:100%;height:130px;object-fit:cover;border-radius:6px;display:block;margin-bottom:7px"/>`
+          : '';
+        const residentsHtml = h.residents && h.residents.length > 1
+          ? `<p style="font-size:11px;color:#555;margin:3px 0">👥 ${h.residents.map(r=>r.name).filter(Boolean).join(', ')}</p>`
+          : '';
+        iw.setContent(`
+          <div style="font-family:sans-serif;padding:6px;min-width:200px;max-width:240px">
+            ${photoHtml}
+            <strong style="font-size:13px">🏡 ${h.name}</strong>
+            <p style="font-size:11px;color:#555;margin:3px 0">${h.owner} · <em>${h.type}</em></p>
+            ${residentsHtml}
+            ${h.description?`<p style="font-size:10px;color:#777;margin:3px 0;font-style:italic">📍 ${h.description}</p>`:''}
+            <div style="margin-top:6px">${h.phones.map(p=>`<a href="tel:${p}" style="font-size:12px;color:#185fa5;display:block;margin-bottom:2px">📞 ${p}</a>`).join('')}</div>
+          </div>`);
         iw.open(map,marker);
       });
       markersRef.current.push(marker);
@@ -496,30 +510,50 @@ function PhotoUpload({houseId, currentUrl, onUploaded, label='Foto de la finca'}
   const [loading,setLoading]=useState(false);
   const [preview,setPreview]=useState(currentUrl||null);
   const [err,setErr]=useState('');
+  const [progress,setProgress]=useState('');
 
   const handleFile=async(e)=>{
     const file=e.target.files?.[0];
     if(!file) return;
-    // Validate
-    if(!file.type.startsWith('image/')) { setErr('Solo se permiten imágenes.'); return; }
-    if(file.size>5*1024*1024) { setErr('La imagen no puede superar 5 MB.'); return; }
+    if(!file.type.startsWith('image/')) { setErr('Solo se permiten imágenes (JPG, PNG, etc).'); return; }
+    if(file.size>5*1024*1024) { setErr('La imagen no puede superar 5 MB. Intente con una foto más pequeña.'); return; }
     setErr('');
-    // Local preview immediately
+    // Show local preview immediately
     const localUrl=URL.createObjectURL(file);
     setPreview(localUrl);
     setLoading(true);
+    setProgress('Subiendo foto...');
+
+    // Timeout after 30 seconds
+    const timeout = new Promise((_,reject)=>
+      setTimeout(()=>reject(new Error('timeout')), 30000)
+    );
+
     try {
       const path=`fincas/${houseId}/foto_${Date.now()}.jpg`;
-      const url=await uploadPhoto(file,path);
+      const url = await Promise.race([
+        uploadPhoto(file, path),
+        timeout
+      ]);
       setPreview(url);
+      setProgress('');
       onUploaded(url);
     } catch(ex){
-      setErr('Error al subir la foto. Verifique que Firebase Storage esté habilitado.');
       setPreview(currentUrl||null);
-    } finally { setLoading(false); }
+      setProgress('');
+      if(ex.message==='timeout'){
+        setErr('La subida tardó demasiado. Verifique que Firebase Storage esté habilitado en su proyecto (console.firebase.google.com → Storage → Comenzar).');
+      } else if(ex.code==='storage/unauthorized'){
+        setErr('Sin permisos. Configure las reglas de Firebase Storage y vuelva a intentarlo.');
+      } else {
+        setErr('No se pudo subir la foto. Verifique que Firebase Storage esté habilitado en su proyecto.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const removePhoto=()=>{ setPreview(null); onUploaded(null); };
+  const removePhoto=()=>{ setPreview(null); onUploaded(null); setErr(''); };
 
   return(
     <div className="field">
@@ -527,12 +561,19 @@ function PhotoUpload({houseId, currentUrl, onUploaded, label='Foto de la finca'}
       <div className={`photo-zone ${preview?'has-photo':''}`}>
         {preview
           ? <img src={preview} alt="Foto finca"/>
-          : <div className="photo-empty"><span>📷</span><p>Toque para subir una foto</p><p style={{fontSize:'.75rem'}}>JPG, PNG · máx. 5 MB</p></div>
+          : <div className="photo-empty"><span>📷</span><p>Toque para adjuntar o tomar una foto</p><p style={{fontSize:'.75rem'}}>JPG, PNG · máx. 5 MB</p></div>
         }
-        <input type="file" accept="image/*" onChange={handleFile} title="Seleccionar foto"/>
-        {loading&&<div className="photo-loading">⏳ Subiendo foto...</div>}
+        {!loading&&<input type="file" accept="image/*" onChange={handleFile} title="Seleccionar foto"/>}
+        {loading&&<div className="photo-loading">⏳ {progress}</div>}
       </div>
-      {err&&<p style={{fontSize:'.75rem',color:'var(--red)',marginTop:4}}>{err}</p>}
+      {err&&(
+        <div style={{background:'var(--red0)',border:'1px solid #f7c1c1',borderRadius:6,padding:'.6rem .75rem',marginTop:6}}>
+          <p style={{fontSize:'.75rem',color:'var(--red)',lineHeight:1.5}}>{err}</p>
+          <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" style={{fontSize:'.73rem',color:'var(--sky)',textDecoration:'underline',display:'inline-block',marginTop:4}}>
+            Ir a Firebase Console →
+          </a>
+        </div>
+      )}
       {preview&&!loading&&(
         <div className="photo-actions">
           <label className="btn-sm" style={{cursor:'pointer',display:'inline-flex',alignItems:'center',gap:4}}>
@@ -1293,12 +1334,15 @@ function SearchView({searchQ,setSearchQ,searchR,setSearchR,houses,infra,nav}){
     {searchR&&searchR.houses.length>0&&<>
       <p style={{fontSize:'.72rem',color:'var(--txm)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:'.55rem',fontWeight:500}}>Fincas ({searchR.houses.length})</p>
       {searchR.houses.map(h=>(
-        <div key={h.id} className="result">
-          <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:7,marginBottom:4,flexWrap:'wrap'}}><h4>{h.name}</h4><span className="badge gray">{h.type}</span></div>
-          <p>Propietario: {h.owner}</p>
-          {h.description&&<p style={{marginTop:3}}>{h.description}</p>}
-          <div style={{marginTop:7}}>{h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip">📞 {p}</a>)}</div>
-          {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)',marginTop:5,display:'inline-block'}}>🗺️ Ver ubicación</a>}
+        <div key={h.id} className="result" style={{padding:0,overflow:'hidden'}}>
+          {h.photoUrl&&<img src={h.photoUrl} alt={h.name} style={{width:'100%',height:130,objectFit:'cover',display:'block'}}/>}
+          <div style={{padding:'.9rem'}}>
+            <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:7,marginBottom:4,flexWrap:'wrap'}}><h4>{h.name}</h4><span className="badge gray">{h.type}</span></div>
+            <p>Propietario: {h.owner}</p>
+            {h.description&&<p style={{marginTop:3}}>{h.description}</p>}
+            <div style={{marginTop:7}}>{h.phones.map((p,i)=><a key={i} href={`tel:${p}`} className="pchip">📞 {p}</a>)}</div>
+            {h.lat&&h.lng&&<a href={`https://www.google.com/maps?q=${h.lat},${h.lng}`} target="_blank" rel="noopener noreferrer" className="pchip" style={{background:'var(--g1)',color:'var(--g7)',marginTop:5,display:'inline-block'}}>🗺️ Ver ubicación</a>}
+          </div>
         </div>
       ))}
     </>}
